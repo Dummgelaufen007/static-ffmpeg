@@ -1,0 +1,7 @@
+buildlogs
+downloads
+qnap
+upstream-pr
+*.tar.xz
+.DS_Store
+.git-upstream
