@@ -1,6 +1,6 @@
 # bump: alpine /ALPINE_VERSION=alpine:([\d.]+)/ docker:alpine|^3
 # bump: alpine link "Release notes" https://alpinelinux.org/posts/Alpine-$LATEST-released.html
-ARG ALPINE_VERSION=alpine:3.20.3
+ARG ALPINE_VERSION=alpine:3.24.2
 FROM $ALPINE_VERSION AS builder
 
 # Alpine Package Keeper options
@@ -41,7 +41,7 @@ RUN apk add --no-cache $APK_OPTS \
   tcl \
   numactl-dev \
   cunit cunit-dev \
-  fftw-dev \
+  fftw-dev fftw-static \
   libsamplerate-dev libsamplerate-static \
   vo-amrwbenc-dev vo-amrwbenc-static \
   snappy snappy-dev snappy-static \
@@ -50,14 +50,10 @@ RUN apk add --no-cache $APK_OPTS \
   python3 py3-packaging \
   linux-headers \
   curl \
-  libdrm-dev \
-  pcre2-dev libffi-dev musl-libintl \
-  pixman-dev pixman-static
+  libdrm-dev
 
 # linux-headers need by rtmpdump
 # python3 py3-packaging needed by glib
-# pcre2-dev libffi-dev musl-libintl replace the pcre2, libffi and proxy-libintl downloads of glib
-# pixman-dev pixman-static replace the pixman download of cairo
 
 # -O3 makes sure we compile with optimization. setting CFLAGS/CXXFLAGS seems to override
 # default automake cflags.
@@ -93,7 +89,6 @@ RUN \
     -Dbuilt_in_models=true \
     -Denable_tests=false \
     -Denable_docs=false \
-    -Denable_tools=false \
     -Denable_avx512=true \
     -Denable_float=true && \
   ninja -j$(nproc) -vC build install
@@ -104,10 +99,10 @@ RUN sed -i 's/-lvmaf /-lvmaf -lstdc++ /' /usr/local/lib/pkgconfig/libvmaf.pc
 # bump: glib /GLIB_VERSION=([\d.]+)/ https://gitlab.gnome.org/GNOME/glib.git|^2
 # bump: glib after ./hashupdate Dockerfile GLIB $LATEST
 # bump: glib link "NEWS" https://gitlab.gnome.org/GNOME/glib/-/blob/main/NEWS?ref_type=heads
-ARG GLIB_VERSION=2.84.1
-ARG GLIB_URL="https://download.gnome.org/sources/glib/2.84/glib-$GLIB_VERSION.tar.xz"
+ARG GLIB_VERSION=2.90.1
+ARG GLIB_URL="https://download.gnome.org/sources/glib/2.90/glib-$GLIB_VERSION.tar.xz"
 ARG GLIB_FILE="glib.$GLIB_VERSION.tar.xz"
-ARG GLIB_SHA256=2b4bc2ec49611a5fc35f86aca855f2ed0196e69e53092bab6bb73396bf30789a
+ARG GLIB_SHA256=93c941aa17d5eb1d53fe838365f29a8b4e539c222a256d974ec8f30fc413e396
 RUN \
   wget -O $GLIB_FILE $WGET_OPTS "$GLIB_URL" && \
   echo "$GLIB_SHA256  $GLIB_FILE" | sha256sum --status -c - && \
@@ -115,8 +110,6 @@ RUN \
   meson setup build \
     -Dbuildtype=release \
     -Ddefault_library=static \
-    -Dtests=false \
-    -Dsysprof=disabled \
     -Dlibmount=disabled && \
   ninja -j$(nproc) -vC build install
 # exported symbols keep rust thread locals as unresolved relocations that a static pie never applies
@@ -135,14 +128,7 @@ RUN \
   tar $TAR_OPTS $LIBHARFBUZZ_FILE && cd harfbuzz-* && \
   meson setup build \
     -Dbuildtype=release \
-    -Ddefault_library=static \
-    -Dgobject=disabled \
-    -Dsubset=disabled \
-    -Draster=disabled \
-    -Dvector=disabled \
-    -Dgpu=disabled \
-    -Dtests=disabled \
-    -Dutilities=disabled && \
+    -Ddefault_library=static && \
   ninja -j$(nproc) -vC build install
 
 # bump: cairo /CAIRO_VERSION=([\d.]+)/ https://gitlab.freedesktop.org/cairo/cairo.git|^1
@@ -160,7 +146,6 @@ RUN \
     -Dbuildtype=release \
     -Ddefault_library=static \
     -Dtests=disabled \
-    -Dtee=disabled \
     -Dquartz=disabled \
     -Dxcb=disabled \
     -Dxlib=disabled \
@@ -171,30 +156,30 @@ RUN \
 # bump: pango /PANGO_VERSION=([\d.]+)/ https://github.com/GNOME/pango.git|/\d+\.\d+\.\d+/|*
 # bump: pango after ./hashupdate Dockerfile PANGO $LATEST
 # bump: pango link "NEWS" https://gitlab.gnome.org/GNOME/pango/-/blob/main/NEWS?ref_type=heads
-ARG PANGO_VERSION=1.56.4
-ARG PANGO_URL="https://download.gnome.org/sources/pango/1.56/pango-$PANGO_VERSION.tar.xz"
+ARG PANGO_VERSION=1.58.2
+ARG PANGO_URL="https://download.gnome.org/sources/pango/1.58/pango-$PANGO_VERSION.tar.xz"
 ARG PANGO_FILE="pango.$PANGO_VERSION.tar.xz"
-ARG PANGO_SHA256=17065e2fcc5f5a5bdbffc884c956bfc7c451a96e8c4fb2f8ad837c6413cb5a01
+ARG PANGO_SHA256=342385b6ca3b7c73455d7c80a13b7dbe4489e00bc3bd4c5bd6ed4dce421e374a
+# TODO: add -Dbuild-testsuite=false when in stable release
+# TODO: -Ddefault_library=both currently to not fail building tests
 RUN \
   wget -O $PANGO_FILE $WGET_OPTS "$PANGO_URL" && \
   echo "$PANGO_SHA256  $PANGO_FILE" | sha256sum --status -c - && \
   tar $TAR_OPTS $PANGO_FILE && cd pango-* && \
   meson setup build \
     -Dbuildtype=release \
-    -Ddefault_library=static \
+    -Ddefault_library=both \
     -Dintrospection=disabled \
-    -Dbuild-testsuite=false \
-    -Dbuild-examples=false \
     -Dgtk_doc=false && \
   ninja -j$(nproc) -vC build install
 
 # bump: librsvg /LIBRSVG_VERSION=([\d.]+)/ https://gitlab.gnome.org/GNOME/librsvg.git|^2
 # bump: librsvg after ./hashupdate Dockerfile LIBRSVG $LATEST
 # bump: librsvg link "NEWS" https://gitlab.gnome.org/GNOME/librsvg/-/blob/master/NEWS
-ARG LIBRSVG_VERSION=2.60.0
-ARG LIBRSVG_URL="https://download.gnome.org/sources/librsvg/2.60/librsvg-$LIBRSVG_VERSION.tar.xz"
+ARG LIBRSVG_VERSION=2.63.2
+ARG LIBRSVG_URL="https://download.gnome.org/sources/librsvg/2.63/librsvg-$LIBRSVG_VERSION.tar.xz"
 ARG LIBRSVG_FILE="librsvg.$LIBRSVG_VERSION.tar.xz"
-ARG LIBRSVG_SHA256=0b6ffccdf6e70afc9876882f5d2ce9ffcf2c713cbaaf1ad90170daa752e1eec3
+ARG LIBRSVG_SHA256=852b18e1a00b8605528825a27dc7748bff2a5dd254028f59dc22a34ea57e81b6
 RUN \
   wget -O $LIBRSVG_FILE $WGET_OPTS "$LIBRSVG_URL" && \
   echo "$LIBRSVG_SHA256  $LIBRSVG_FILE" | sha256sum --status -c - && \
@@ -256,7 +241,6 @@ RUN \
   tar $TAR_OPTS $LIBARIBB24_FILE -C libaribb24 --strip-components=1 && cd libaribb24 && \
   autoreconf -fiv && \
   ./configure \
-    --disable-dependency-tracking \
     --enable-static \
     --disable-shared && \
   make -j$(nproc) && make install
@@ -273,7 +257,6 @@ RUN \
   echo "$LIBASS_SHA256  $LIBASS_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $LIBASS_FILE && cd libass-* && \
   ./configure \
-    --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
   make -j$(nproc) && make install
@@ -307,8 +290,7 @@ RUN \
   tar $TAR_OPTS $LIBBLURAY_FILE && cd libbluray-* && \
   meson setup build \
     -Dbuildtype=release \
-    -Ddefault_library=static \
-    -Denable_tools=false && \
+    -Ddefault_library=static && \
   ninja -j$(nproc) -vC build install
 
 # bump: dav1d /DAV1D_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/dav1d/last/|/dav1d-([\d.]+)\.tar\.xz/
@@ -324,9 +306,7 @@ RUN \
   tar $TAR_OPTS $DAV1D_FILE && cd dav1d-* && \
   meson setup build \
     -Dbuildtype=release \
-    -Ddefault_library=static \
-    -Denable_tools=false \
-    -Denable_tests=false && \
+    -Ddefault_library=static && \
   ninja -j$(nproc) -vC build install
 
 # bump: davs2 /DAVS2_VERSION=([\d.]+)/ https://github.com/pkuvcl/davs2.git|^1
@@ -363,22 +343,18 @@ RUN \
   tar $TAR_OPTS $FDK_AAC_FILE && cd fdk-aac-* && \
   ./autogen.sh && \
   ./configure \
-    --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
   make -j$(nproc) install
 
-# bump: libgme /LIBGME_VERSION=([\d.]+)/ https://github.com/libgme/game-music-emu.git|*
+# bump: libgme /LIBGME_COMMIT=([[:xdigit:]]+)/ gitrefs:https://github.com/libgme/game-music-emu.git|re:#^refs/heads/master$#|@commit
 # bump: libgme after ./hashupdate Dockerfile LIBGME $LATEST
-# bump: libgme link "Source diff $CURRENT..$LATEST" https://github.com/libgme/game-music-emu/compare/$CURRENT..$LATEST
-ARG LIBGME_VERSION=0.6.5
-ARG LIBGME_URL="https://github.com/libgme/game-music-emu/releases/download/$LIBGME_VERSION/libgme-$LIBGME_VERSION-src.tar.gz"
-ARG LIBGME_FILE="libgme.$LIBGME_VERSION.tar.gz"
-ARG LIBGME_SHA256=a133f19278222136ba0d8c27b64a07987ba05fec9d2e6d293ccd8cabdd97ddbb
+# bump: libgme link "Source diff $CURRENT..$LATEST" https://github.com/libgme/game-music-emu/compare/$CURRENT..v$LATEST
+ARG LIBGME_URL="https://github.com/libgme/game-music-emu.git"
+ARG LIBGME_COMMIT=f68963b1de0633149b05732113d3c3113c6f63a1
 RUN \
-  wget -O $LIBGME_FILE $WGET_OPTS "$LIBGME_URL" && \
-  echo "$LIBGME_SHA256  $LIBGME_FILE" | sha256sum -c - && \
-  tar $TAR_OPTS $LIBGME_FILE && cd libgme-* && \
+  git clone "$LIBGME_URL" && \
+  cd game-music-emu && git checkout --recurse-submodules $LIBGME_COMMIT && \
   mkdir build && cd build && \
   cmake \
     -G"Unix Makefiles" \
@@ -389,17 +365,14 @@ RUN \
     .. && \
   make -j$(nproc) install
 
-# bump: libgsm /LIBGSM_VERSION=([\d.]+)/ fetch:https://www.quut.com/gsm/|/gsm-([\d.]+)\.tar\.gz/
+# bump: libgsm /LIBGSM_COMMIT=([[:xdigit:]]+)/ gitrefs:https://github.com/timothytylee/libgsm.git|re:#^refs/heads/master$#|@commit
 # bump: libgsm after ./hashupdate Dockerfile LIBGSM $LATEST
-# bump: libgsm link "Homepage" https://www.quut.com/gsm/
-ARG LIBGSM_VERSION=1.0.24
-ARG LIBGSM_URL="https://www.quut.com/gsm/gsm-$LIBGSM_VERSION.tar.gz"
-ARG LIBGSM_FILE="libgsm.$LIBGSM_VERSION.tar.gz"
-ARG LIBGSM_SHA256=a3c40c6471928383f4abfcb2e8f24012a1f562be2f17b8d672145d5986681a92
+# bump: libgsm link "Changelog" https://github.com/timothytylee/libgsm/blob/master/ChangeLog
+ARG LIBGSM_URL="https://github.com/timothytylee/libgsm.git"
+ARG LIBGSM_COMMIT=98f1708fb5e06a0dfebd58a3b40d610823db9715
 RUN \
-  wget -O $LIBGSM_FILE $WGET_OPTS "$LIBGSM_URL" && \
-  echo "$LIBGSM_SHA256  $LIBGSM_FILE" | sha256sum -c - && \
-  tar $TAR_OPTS $LIBGSM_FILE && cd gsm-* && \
+  git clone "$LIBGSM_URL" && \
+  cd libgsm && git checkout --recurse-submodules $LIBGSM_COMMIT && \
   # Makefile is hard to use, hence use specific compile arguments and flags
   # no need to build toast cli tool \
   rm src/toast* && \
@@ -423,7 +396,6 @@ RUN \
   tar $TAR_OPTS $KVAZAAR_FILE && cd kvazaar-* && \
   ./autogen.sh && \
   ./configure \
-    --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
   make -j$(nproc) install
@@ -440,7 +412,6 @@ RUN \
   echo "$LIBMODPLUG_SHA256  $LIBMODPLUG_FILE" | sha256sum -c && \
   tar $TAR_OPTS $LIBMODPLUG_FILE && cd libmodplug-* && \
   ./configure \
-    --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
   make -j$(nproc) install
@@ -457,14 +428,11 @@ RUN \
   echo "$MP3LAME_SHA256  $MP3LAME_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $MP3LAME_FILE && cd lame-* && \
   ./configure \
-    --disable-dependency-tracking \
     --disable-shared \
     --enable-static \
     --enable-nasm \
     --disable-gtktest \
     --disable-cpml \
-    --disable-decoder \
-    --disable-analyzer-hooks \
     --disable-frontend && \
   make -j$(nproc) install
 
@@ -481,10 +449,7 @@ RUN \
   tar $TAR_OPTS $LCMS2_FILE && cd lcms2-* && \
   ./autogen.sh && \
   ./configure \
-    --disable-dependency-tracking \
     --enable-static \
-    --without-jpeg \
-    --without-tiff \
     --disable-shared && \
   make -j$(nproc) install
 
@@ -522,7 +487,6 @@ RUN \
   echo "$OPENCOREAMR_SHA256  $OPENCOREAMR_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $OPENCOREAMR_FILE && cd opencore-amr-* && \
   ./configure \
-    --disable-dependency-tracking \
     --enable-static \
     --disable-shared && \
   make -j$(nproc) install
@@ -564,7 +528,6 @@ RUN \
   echo "$OPUS_SHA256  $OPUS_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $OPUS_FILE && cd opus-* && \
   ./configure \
-    --disable-dependency-tracking \
     --disable-shared \
     --enable-static \
     --disable-extra-programs \
@@ -593,8 +556,6 @@ RUN \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_TESTS=OFF \
-    -DBUILD_TESTING=OFF \
-    -DENABLE_SSL_SUPPORT=OFF \
     -DBUILD_TOOLS=OFF \
     -DBUILD_TOOLS_DOCS=OFF \
     -DRUN_SYSTEM_TESTS=OFF \
@@ -604,20 +565,16 @@ RUN \
 # bump: rav1e /RAV1E_VERSION=([\d.]+)/ https://github.com/xiph/rav1e.git|/\d+\./|*
 # bump: rav1e after ./hashupdate Dockerfile RAV1E $LATEST
 # bump: rav1e link "Release notes" https://github.com/xiph/rav1e/releases/tag/v$LATEST
-ARG RAV1E_VERSION=0.7.1
+ARG RAV1E_VERSION=0.8.1
 ARG RAV1E_URL="https://github.com/xiph/rav1e/archive/v$RAV1E_VERSION.tar.gz"
 ARG RAV1E_FILE="rav1e.$RAV1E_VERSION.tar.gz"
-ARG RAV1E_SHA256=da7ae0df2b608e539de5d443c096e109442cdfa6c5e9b4014361211cf61d030c
+ARG RAV1E_SHA256=06d1523955fb6ed9cf9992eace772121067cca7e8926988a1ee16492febbe01e
 RUN \
   wget -O $RAV1E_FILE $WGET_OPTS "$RAV1E_URL" && \
   echo "$RAV1E_SHA256  $RAV1E_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $RAV1E_FILE && cd rav1e-* && \
   RUSTFLAGS="-C target-feature=+crt-static" \
-  CARGO_PROFILE_RELEASE_DEBUG=false \
-  cargo cinstall --release \
-    --library-type staticlib \
-    --no-default-features \
-    --features asm,threading,git_version,capi
+  cargo cinstall --library-type staticlib --release
 
 # bump: librtmp /LIBRTMP_COMMIT=([[:xdigit:]]+)/ gitrefs:https://git.ffmpeg.org/rtmpdump.git|re:#^refs/heads/master$#|@commit
 # bump: librtmp after ./hashupdate Dockerfile LIBRTMP $LATEST
@@ -627,7 +584,7 @@ ARG LIBRTMP_COMMIT=138fdb258d9fc26f1843fd1b891180416c9dc575
 RUN \
   git clone "$LIBRTMP_URL" && cd rtmpdump && \
   git checkout --recurse-submodules $LIBRTMP_COMMIT && \
-  make -C librtmp SYS=posix SHARED=off -j$(nproc) install
+  make SYS=posix SHARED=off -j$(nproc) install
 
 # bump: rubberband /RUBBERBAND_VERSION=([\d.]+)/ https://github.com/breakfastquay/rubberband.git|^2
 # bump: rubberband after ./hashupdate Dockerfile RUBBERBAND $LATEST
@@ -658,10 +615,11 @@ ARG LIBSHINE_FILE="libshine.$LIBSHINE_VERSION.tar.gz"
 ARG LIBSHINE_SHA256=58e61e70128cf73f88635db495bfc17f0dde3ce9c9ac070d505a0cd75b93d384
 RUN \
   wget -O $LIBSHINE_FILE $WGET_OPTS "$LIBSHINE_URL" && \
+  # https://github.com/toots/shine/commit/098b9aaa6770a41bdf3f9c049307c1398f04d2d3
   echo "$LIBSHINE_SHA256  $LIBSHINE_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $LIBSHINE_FILE && cd shine-* && \
+  sed -i 's/shine_mdct_initialise()/shine_mdct_initialise(shine_global_config *config)/' src/lib/l3mdct.h && \
   ./configure \
-    --disable-dependency-tracking \
     --with-pic \
     --enable-static \
     --disable-shared \
@@ -682,7 +640,6 @@ RUN \
   tar $TAR_OPTS $SPEEX_FILE && cd speex-Speex-* && \
   ./autogen.sh && \
   ./configure \
-    --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
   make -j$(nproc) install
@@ -699,7 +656,7 @@ RUN \
   echo "$SRT_SHA256  $SRT_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $SRT_FILE && cd srt-* && \
   mkdir build && cd build && \
-  cmake \
+  cmake3.5 \
     -G"Unix Makefiles" \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_BUILD_TYPE=Release \
@@ -719,10 +676,10 @@ RUN \
 # bump: libssh after ./hashupdate Dockerfile LIBSSH $LATEST
 # bump: libssh link "Source diff $CURRENT..$LATEST" https://gitlab.com/libssh/libssh-mirror/-/compare/libssh-$CURRENT...libssh-$LATEST
 # bump: libssh link "Release notes" https://gitlab.com/libssh/libssh-mirror/-/tags/libssh-$LATEST
-ARG LIBSSH_VERSION=0.12.1
+ARG LIBSSH_VERSION=0.12.2
 ARG LIBSSH_URL="https://gitlab.com/libssh/libssh-mirror/-/archive/libssh-$LIBSSH_VERSION/libssh-mirror-libssh-$LIBSSH_VERSION.tar.gz"
 ARG LIBSSH_FILE="libssh.$LIBSSH_VERSION.tar.gz"
-ARG LIBSSH_SHA256=8c45cb01fbd373334561fd6d1bbe124cdc6ef541c17fc17dee10747ce2d6433f
+ARG LIBSSH_SHA256=92fef8a348070a6786667ed724d5e808d2530464bac37559a8d59c70ab1f1a83
 # LIBSSH_STATIC=1 is REQUIRED to link statically against libssh.a so add to pkg-config file
 RUN \
   wget -O $LIBSSH_FILE $WGET_OPTS "$LIBSSH_URL" && \
@@ -744,7 +701,7 @@ RUN \
     -DWITH_SFTP=ON \
     -DWITH_SERVER=OFF \
     -DWITH_ZLIB=ON \
-    -DWITH_PCAP=OFF \
+    -DWITH_PCAP=ON \
     -DWITH_DEBUG_CRYPTO=OFF \
     -DWITH_DEBUG_PACKET=OFF \
     -DWITH_DEBUG_CALLTRACE=OFF \
@@ -773,8 +730,6 @@ RUN \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DBUILD_SHARED_LIBS=OFF \
-    -DBUILD_APPS=OFF \
-    -DSVT_AV1_LTO=OFF \
     -DENABLE_AVX512=ON \
     -DCMAKE_BUILD_TYPE=Release \
     .. && \
@@ -794,7 +749,6 @@ RUN \
   echo "$OGG_SHA256  $OGG_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $OGG_FILE && cd libogg-* && \
   ./configure \
-    --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
   make -j$(nproc) install
@@ -814,7 +768,6 @@ RUN \
   # --build=$(arch)-unknown-linux-gnu helps with guessing the correct build. For some reason,
   # build script can't guess the build type in arm64 (hardware and emulated) environment.
  ./configure \
-   --disable-dependency-tracking \
    --build=$(arch)-unknown-linux-gnu \
    --disable-examples \
    --disable-oggtest \
@@ -834,7 +787,6 @@ RUN \
   echo "$TWOLAME_SHA256  $TWOLAME_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $TWOLAME_FILE && cd twolame-* && \
   ./configure \
-    --disable-dependency-tracking \
     --disable-shared \
     --enable-static \
     --disable-sndfile \
@@ -851,7 +803,7 @@ RUN \
   git clone "$UAVS3D_URL" && cd uavs3d && \
   git checkout --recurse-submodules $UAVS3D_COMMIT && \
   mkdir build/linux && cd build/linux && \
-  cmake \
+  cmake3.5 \
     -G"Unix Makefiles" \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_BUILD_TYPE=Release \
@@ -874,7 +826,7 @@ RUN \
   # This line workarounds the issue that happens when the image builds in emulated (buildx) arm64 environment.
   # Since in emulated container the /proc is mounted from the host, the cmake not able to detect CPU features correctly.
   sed -i 's/include (FindSSE)/if(CMAKE_SYSTEM_ARCH MATCHES "amd64")\ninclude (FindSSE)\nendif()/' ../CMakeLists.txt && \
-  cmake \
+  cmake3.5 \
     -G"Unix Makefiles" \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_SYSTEM_ARCH=$(arch) \
@@ -898,7 +850,6 @@ RUN \
   echo "$VORBIS_SHA256  $VORBIS_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $VORBIS_FILE && cd libvorbis-* && \
   ./configure \
-    --disable-dependency-tracking \
     --disable-shared \
     --enable-static \
     --disable-oggtest && \
@@ -917,12 +868,10 @@ RUN \
   echo "$VPX_SHA256  $VPX_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $VPX_FILE && cd libvpx-* && \
   ./configure \
-    --disable-dependency-tracking \
     --enable-static \
     --enable-vp9-highbitdepth \
     --disable-shared \
     --disable-unit-tests \
-    --disable-tools \
     --disable-examples && \
   make -j$(nproc) install
 
@@ -940,7 +889,6 @@ RUN \
   tar $TAR_OPTS $LIBWEBP_FILE && cd libwebp-* && \
   ./autogen.sh && \
   ./configure \
-    --disable-dependency-tracking \
     --disable-shared \
     --enable-static \
     --with-pic \
@@ -987,8 +935,13 @@ RUN \
   tar $TAR_OPTS $X265_FILE && cd x265_*/build/linux && \
   sed -i '/^cmake / s/$/ -G "Unix Makefiles" ${CMAKEFLAGS}/' ./multilib.sh && \
   sed -i 's/ -DENABLE_SHARED=OFF//g' ./multilib.sh && \
+  # https://bitbucket.org/multicoreware/x265_git/commits/b354c009a60bcd6d7fc04014e200a1ee9c45c167
+  sed -i 's/cmake_policy(SET CMP0025 OLD)/cmake_policy(SET CMP0025 NEW)/g' ../../source/CMakeLists.txt && \
+  sed -i 's/cmake_policy(SET CMP0054 OLD)/cmake_policy(SET CMP0054 NEW)/g' ../../source/CMakeLists.txt && \
+  # https://bitbucket.org/multicoreware/x265_git/issues/1008/build-fails-with-cmake-4
+  sed -i 's/cmake/cmake3.5/g' ./multilib.sh && \
   MAKEFLAGS="-j$(nproc)" \
-  CMAKEFLAGS="-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DCMAKE_VERBOSE_MAKEFILE=ON -DENABLE_AGGRESSIVE_CHECKS=ON -DENABLE_NASM=ON -DCMAKE_BUILD_TYPE=Release" \
+  CMAKEFLAGS="-DENABLE_SHARED=OFF -DCMAKE_VERBOSE_MAKEFILE=ON -DENABLE_AGGRESSIVE_CHECKS=ON -DENABLE_NASM=ON -DCMAKE_BUILD_TYPE=Release" \
   ./multilib.sh && \
   make -C 8bit -j$(nproc) install
 
@@ -1005,6 +958,8 @@ RUN \
   wget -O $XAVS2_FILE $WGET_OPTS "$XAVS2_URL" && \
   echo "$XAVS2_SHA256  $XAVS2_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $XAVS2_FILE && cd xavs2-*/build/linux && \
+  # new gcc not happy with some of the code
+  CFLAGS="$CFLAGS -Wno-incompatible-pointer-types -Wno-unused-function" \
   ./configure \
     --disable-asm \
     --enable-pic \
@@ -1023,7 +978,8 @@ RUN \
   wget -O $XVID_FILE $WGET_OPTS "$XVID_URL" && \
   echo "$XVID_SHA256  $XVID_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $XVID_FILE && cd xvidcore/build/generic && \
-  CFLAGS="$CFLAGS -fstrength-reduce -ffast-math" ./configure && \
+  # gnu18 to fix issue type own bool typedef
+  CFLAGS="$CFLAGS -std=gnu18 -fstrength-reduce -ffast-math" ./configure && \
   make -j$(nproc) && make install
 
 # bump: xeve /XEVE_VERSION=([\d.]+)/ https://github.com/mpeg5/xeve.git|*
@@ -1065,7 +1021,6 @@ RUN \
   echo "$XEVD_SHA256  $XEVD_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $XEVD_FILE && cd xevd-* && \
   echo v$XEVD_VERSION > version.txt && \
-  sed -i 's/mc_filter_bilin/xevdm_mc_filter_bilin/' src_main/sse/xevdm_mc_sse.c && \
   mkdir build && cd build && \
   cmake \
     -G"Unix Makefiles" \
@@ -1088,38 +1043,14 @@ RUN \
   tar $TAR_OPTS $ZIMG_FILE && cd zimg-* && \
   ./autogen.sh && \
   ./configure \
-    --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
   make -j$(nproc) install
 
-# highway is the only third_party source of libjxl this build uses, pinned by libjxl deps.sh and bumped with libjxl
-ARG HIGHWAY_VERSION=1.2.0
-ARG HIGHWAY_URL="https://github.com/google/highway/releases/download/$HIGHWAY_VERSION/highway-$HIGHWAY_VERSION.tar.gz"
-ARG HIGHWAY_FILE="highway.$HIGHWAY_VERSION.tar.gz"
-ARG HIGHWAY_SHA256=58e9d5d41d6573ad15245ad76aec53a69499ca7480c092d899c4424812ed906f
-RUN \
-  wget -O $HIGHWAY_FILE $WGET_OPTS "$HIGHWAY_URL" && \
-  echo "$HIGHWAY_SHA256  $HIGHWAY_FILE" | sha256sum -c - && \
-  tar $TAR_OPTS $HIGHWAY_FILE && cd highway-* && \
-  cmake -B build \
-    -G"Unix Makefiles" \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
-    -DCMAKE_INSTALL_LIBDIR=lib \
-    -DCMAKE_INSTALL_PREFIX=/usr/local \
-    -DBUILD_SHARED_LIBS=OFF \
-    -DHWY_ENABLE_CONTRIB=OFF \
-    -DHWY_ENABLE_EXAMPLES=OFF \
-    -DHWY_ENABLE_TESTS=OFF && \
-  cmake --build build -j$(nproc) && \
-  cmake --install build
-
 # bump: libjxl /LIBJXL_VERSION=([\d.]+)/ https://github.com/libjxl/libjxl.git|^0
 # bump: libjxl after ./hashupdate Dockerfile LIBJXL $LATEST
-# bump: libjxl after HWY=$(curl -sL https://raw.githubusercontent.com/libjxl/libjxl/v$LATEST/deps.sh | sed -n 's/^THIRD_PARTY_HIGHWAY="\([0-9a-f]*\)".*/\1/p') && V=$(git ls-remote --tags https://github.com/google/highway | awk -v c=$HWY '$1==c {sub("refs/tags/","",$2); sub("\\^\\{\\}","",$2); print $2}') && sed -i -E "s/^ARG HIGHWAY_VERSION=.*/ARG HIGHWAY_VERSION=$V/" Dockerfile && ./hashupdate Dockerfile HIGHWAY $V
 # bump: libjxl link "Changelog" https://github.com/libjxl/libjxl/blob/main/CHANGELOG.md
-# highway is built above as its static build is not available in alpine
+# use bundled highway library as its static build is not available in alpine
 ARG LIBJXL_VERSION=0.12.0
 ARG LIBJXL_URL="https://github.com/libjxl/libjxl/archive/refs/tags/v${LIBJXL_VERSION}.tar.gz"
 ARG LIBJXL_FILE="libjxl.$LIBJXL_VERSION.tar.gz"
@@ -1128,6 +1059,7 @@ RUN \
   wget -O $LIBJXL_FILE $WGET_OPTS "$LIBJXL_URL" && \
   echo "$LIBJXL_SHA256  $LIBJXL_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $LIBJXL_FILE && cd libjxl-* && \
+  ./deps.sh && \
   cmake -B build \
     -G"Unix Makefiles" \
     -DCMAKE_BUILD_TYPE=Release \
@@ -1144,11 +1076,9 @@ RUN \
     -DJPEGXL_ENABLE_SJPEG=OFF \
     -DJPEGXL_ENABLE_SKCMS=OFF \
     -DJPEGXL_ENABLE_VIEWERS=OFF \
-    -DJPEGXL_ENABLE_TOOLS=OFF \
-    -DJPEGXL_ENABLE_TRANSCODE_JPEG=OFF \
     -DJPEGXL_FORCE_SYSTEM_GTEST=ON \
     -DJPEGXL_FORCE_SYSTEM_BROTLI=ON \
-    -DJPEGXL_FORCE_SYSTEM_HWY=ON && \
+    -DJPEGXL_FORCE_SYSTEM_HWY=OFF && \
   cmake --build build -j$(nproc) && \
   cmake --install build
 # workaround for ffmpeg configure script
@@ -1171,11 +1101,7 @@ RUN \
   # fix sha1_init symbol collision with libssh
   grep -r -l sha1_init external/sha1* | xargs sed -i 's/sha1_init/zeromq_sha1_init/g' && \
   ./configure \
-    --disable-dependency-tracking \
     --disable-shared \
-    --disable-perf \
-    --disable-curve-keygen \
-    --without-docs \
     --enable-static && \
   make -j$(nproc) install
 
@@ -1222,7 +1148,6 @@ RUN \
     -DCMAKE_INSTALL_PREFIX=/usr/local \
     -DBUILD_SHARED_LIBS=OFF \
     -DBUILD_TESTS=OFF \
-    -DINSTALL_EXAMPLES=OFF \
     -DENABLE_WARNING_AS_ERROR=ON && \
   cmake --build build -j$(nproc) && \
   cmake --install build
@@ -1245,7 +1170,6 @@ RUN \
     -S . \
     -B build/release-static \
     -DVVENC_ENABLE_WERROR=OFF \
-    -DVVENC_LIBRARY_ONLY=ON \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/usr/local && \
   cmake --build build/release-static -j$(nproc) && \
@@ -1344,7 +1268,7 @@ RUN \
   --enable-libzmq \
   --enable-openssl \
   || (cat ffbuild/config.log ; false) \
-  && set -o pipefail && make -j$(nproc) install LDXX='$(CXX) -Wl,-t' | tee ld-trace.log
+  && make -j$(nproc) install
 
 RUN \
   EXPAT_VERSION=$(pkg-config --modversion expat) \
@@ -1374,8 +1298,8 @@ RUN \
   libdavs2: env.DAVS2_VERSION, \
   libfreetype: env.FREETYPE_VERSION, \
   libfribidi: env.FRIBIDI_VERSION, \
-  libgme: env.LIBGME_VERSION, \
-  libgsm: env.LIBGSM_VERSION, \
+  libgme: env.LIBGME_COMMIT, \
+  libgsm: env.LIBGSM_COMMIT, \
   libharfbuzz: env.LIBHARFBUZZ_VERSION, \
   libjxl: env.LIBJXL_VERSION, \
   libkvazaar: env.KVAZAAR_VERSION, \
@@ -1429,7 +1353,7 @@ RUN --mount=src=checkelf,dst=/checkelf \
   /checkelf /usr/local/bin/ffprobe
 # workaround for using -Wl,--allow-multiple-definition
 # see comment in checkdupsym for details
-RUN --mount=src=checkdupsym.opt,dst=/checkdupsym /checkdupsym /ffmpeg-*
+RUN --mount=src=checkdupsym,dst=/checkdupsym /checkdupsym /ffmpeg-*
 
 # some basic fonts that don't take up much space
 RUN apk add $APK_OPTS font-terminus font-inconsolata font-dejavu font-awesome

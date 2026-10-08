@@ -1,6 +1,6 @@
 # bump: alpine /ALPINE_VERSION=alpine:([\d.]+)/ docker:alpine|^3
 # bump: alpine link "Release notes" https://alpinelinux.org/posts/Alpine-$LATEST-released.html
-ARG ALPINE_VERSION=alpine:3.20.3
+ARG ALPINE_VERSION=alpine:3.24.2
 FROM $ALPINE_VERSION AS builder
 
 # Alpine Package Keeper options
@@ -41,7 +41,7 @@ RUN apk add --no-cache $APK_OPTS \
   tcl \
   numactl-dev \
   cunit cunit-dev \
-  fftw-dev \
+  fftw-dev fftw-static \
   libsamplerate-dev libsamplerate-static \
   vo-amrwbenc-dev vo-amrwbenc-static \
   snappy snappy-dev snappy-static \
@@ -98,9 +98,9 @@ RUN sed -i 's/-lvmaf /-lvmaf -lstdc++ /' /usr/local/lib/pkgconfig/libvmaf.pc
 # bump: glib /GLIB_VERSION=([\d.]+)/ https://gitlab.gnome.org/GNOME/glib.git|^2
 # bump: glib after ./hashupdate Dockerfile GLIB $LATEST
 # bump: glib link "NEWS" https://gitlab.gnome.org/GNOME/glib/-/blob/main/NEWS?ref_type=heads
-ARG GLIB_VERSION=2.84.1
-ARG GLIB_URL="https://download.gnome.org/sources/glib/2.84/glib-$GLIB_VERSION.tar.xz"
-ARG GLIB_SHA256=2b4bc2ec49611a5fc35f86aca855f2ed0196e69e53092bab6bb73396bf30789a
+ARG GLIB_VERSION=2.90.1
+ARG GLIB_URL="https://download.gnome.org/sources/glib/2.90/glib-$GLIB_VERSION.tar.xz"
+ARG GLIB_SHA256=93c941aa17d5eb1d53fe838365f29a8b4e539c222a256d974ec8f30fc413e396
 RUN \
   wget $WGET_OPTS -O glib.tar.xz "$GLIB_URL" && \
   echo "$GLIB_SHA256  glib.tar.xz" | sha256sum --status -c - && \
@@ -152,9 +152,9 @@ RUN \
 # bump: pango /PANGO_VERSION=([\d.]+)/ https://github.com/GNOME/pango.git|/\d+\.\d+\.\d+/|*
 # bump: pango after ./hashupdate Dockerfile PANGO $LATEST
 # bump: pango link "NEWS" https://gitlab.gnome.org/GNOME/pango/-/blob/main/NEWS?ref_type=heads
-ARG PANGO_VERSION=1.56.4
-ARG PANGO_URL="https://download.gnome.org/sources/pango/1.56/pango-$PANGO_VERSION.tar.xz"
-ARG PANGO_SHA256=17065e2fcc5f5a5bdbffc884c956bfc7c451a96e8c4fb2f8ad837c6413cb5a01
+ARG PANGO_VERSION=1.58.2
+ARG PANGO_URL="https://download.gnome.org/sources/pango/1.58/pango-$PANGO_VERSION.tar.xz"
+ARG PANGO_SHA256=342385b6ca3b7c73455d7c80a13b7dbe4489e00bc3bd4c5bd6ed4dce421e374a
 # TODO: add -Dbuild-testsuite=false when in stable release
 # TODO: -Ddefault_library=both currently to not fail building tests
 RUN \
@@ -171,9 +171,9 @@ RUN \
 # bump: librsvg /LIBRSVG_VERSION=([\d.]+)/ https://gitlab.gnome.org/GNOME/librsvg.git|^2
 # bump: librsvg after ./hashupdate Dockerfile LIBRSVG $LATEST
 # bump: librsvg link "NEWS" https://gitlab.gnome.org/GNOME/librsvg/-/blob/master/NEWS
-ARG LIBRSVG_VERSION=2.60.0
-ARG LIBRSVG_URL="https://download.gnome.org/sources/librsvg/2.60/librsvg-$LIBRSVG_VERSION.tar.xz"
-ARG LIBRSVG_SHA256=0b6ffccdf6e70afc9876882f5d2ce9ffcf2c713cbaaf1ad90170daa752e1eec3
+ARG LIBRSVG_VERSION=2.63.2
+ARG LIBRSVG_URL="https://download.gnome.org/sources/librsvg/2.63/librsvg-$LIBRSVG_VERSION.tar.xz"
+ARG LIBRSVG_SHA256=852b18e1a00b8605528825a27dc7748bff2a5dd254028f59dc22a34ea57e81b6
 RUN \
   wget $WGET_OPTS -O librsvg.tar.xz "$LIBRSVG_URL" && \
   echo "$LIBRSVG_SHA256  librsvg.tar.xz" | sha256sum --status -c - && \
@@ -213,6 +213,7 @@ RUN \
     -DENABLE_DOCS=NO \
     -DENABLE_TESTS=NO \
     -DENABLE_TOOLS=NO \
+    -DENABLE_APPS=NO \
     -DCONFIG_TUNE_VMAF=1 \
     -DCONFIG_LIBYUV=0 \
     -DENABLE_NASM=ON \
@@ -337,7 +338,7 @@ RUN \
 # bump: libgme after ./hashupdate Dockerfile LIBGME $LATEST
 # bump: libgme link "Source diff $CURRENT..$LATEST" https://github.com/libgme/game-music-emu/compare/$CURRENT..v$LATEST
 ARG LIBGME_URL="https://github.com/libgme/game-music-emu.git"
-ARG LIBGME_COMMIT=265d8b90c9b46bd3b892443dee4da585a0384858
+ARG LIBGME_COMMIT=f68963b1de0633149b05732113d3c3113c6f63a1
 RUN \
   git clone "$LIBGME_URL" && \
   cd game-music-emu && git checkout --recurse-submodules $LIBGME_COMMIT && \
@@ -542,15 +543,15 @@ RUN \
 # bump: rav1e /RAV1E_VERSION=([\d.]+)/ https://github.com/xiph/rav1e.git|/\d+\./|*
 # bump: rav1e after ./hashupdate Dockerfile RAV1E $LATEST
 # bump: rav1e link "Release notes" https://github.com/xiph/rav1e/releases/tag/v$LATEST
-ARG RAV1E_VERSION=0.7.1
+ARG RAV1E_VERSION=0.8.1
 ARG RAV1E_URL="https://github.com/xiph/rav1e/archive/v$RAV1E_VERSION.tar.gz"
-ARG RAV1E_SHA256=da7ae0df2b608e539de5d443c096e109442cdfa6c5e9b4014361211cf61d030c
+ARG RAV1E_SHA256=06d1523955fb6ed9cf9992eace772121067cca7e8926988a1ee16492febbe01e
 RUN \
   wget $WGET_OPTS -O rav1e.tar.gz "$RAV1E_URL" && \
   echo "$RAV1E_SHA256  rav1e.tar.gz" | sha256sum -c - && \
   tar $TAR_OPTS rav1e.tar.gz && cd rav1e-* && \
   RUSTFLAGS="-C target-feature=+crt-static" \
-  cargo cinstall --release
+  cargo cinstall --library-type staticlib --release
 
 # bump: librtmp /LIBRTMP_COMMIT=([[:xdigit:]]+)/ gitrefs:https://git.ffmpeg.org/rtmpdump.git|re:#^refs/heads/master$#|@commit
 # bump: librtmp after ./hashupdate Dockerfile LIBRTMP $LATEST
@@ -589,8 +590,10 @@ ARG LIBSHINE_URL="https://github.com/toots/shine/releases/download/$LIBSHINE_VER
 ARG LIBSHINE_SHA256=58e61e70128cf73f88635db495bfc17f0dde3ce9c9ac070d505a0cd75b93d384
 RUN \
   wget $WGET_OPTS -O libshine.tar.gz "$LIBSHINE_URL" && \
+  # https://github.com/toots/shine/commit/098b9aaa6770a41bdf3f9c049307c1398f04d2d3
   echo "$LIBSHINE_SHA256  libshine.tar.gz" | sha256sum -c - && \
   tar $TAR_OPTS libshine.tar.gz && cd shine* && \
+  sed -i 's/shine_mdct_initialise()/shine_mdct_initialise(shine_global_config *config)/' src/lib/l3mdct.h && \
   ./configure \
     --with-pic \
     --enable-static \
@@ -626,7 +629,7 @@ RUN \
   echo "$SRT_SHA256  libsrt.tar.gz" | sha256sum -c - && \
   tar $TAR_OPTS libsrt.tar.gz && cd srt-* && \
   mkdir build && cd build && \
-  cmake \
+  cmake3.5 \
     -G"Unix Makefiles" \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_BUILD_TYPE=Release \
@@ -646,9 +649,9 @@ RUN \
 # bump: libssh after ./hashupdate Dockerfile LIBSSH $LATEST
 # bump: libssh link "Source diff $CURRENT..$LATEST" https://gitlab.com/libssh/libssh-mirror/-/compare/libssh-$CURRENT...libssh-$LATEST
 # bump: libssh link "Release notes" https://gitlab.com/libssh/libssh-mirror/-/tags/libssh-$LATEST
-ARG LIBSSH_VERSION=0.12.1
+ARG LIBSSH_VERSION=0.12.2
 ARG LIBSSH_URL="https://gitlab.com/libssh/libssh-mirror/-/archive/libssh-$LIBSSH_VERSION/libssh-mirror-libssh-$LIBSSH_VERSION.tar.gz"
-ARG LIBSSH_SHA256=8c45cb01fbd373334561fd6d1bbe124cdc6ef541c17fc17dee10747ce2d6433f
+ARG LIBSSH_SHA256=92fef8a348070a6786667ed724d5e808d2530464bac37559a8d59c70ab1f1a83
 # LIBSSH_STATIC=1 is REQUIRED to link statically against libssh.a so add to pkg-config file
 RUN \
   wget $WGET_OPTS -O libssh.tar.gz "$LIBSSH_URL" && \
@@ -768,7 +771,7 @@ RUN \
   git clone "$UAVS3D_URL" && cd uavs3d && \
   git checkout --recurse-submodules $UAVS3D_COMMIT && \
   mkdir build/linux && cd build/linux && \
-  cmake \
+  cmake3.5 \
     -G"Unix Makefiles" \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_BUILD_TYPE=Release \
@@ -790,7 +793,7 @@ RUN \
   # This line workarounds the issue that happens when the image builds in emulated (buildx) arm64 environment.
   # Since in emulated container the /proc is mounted from the host, the cmake not able to detect CPU features correctly.
   sed -i 's/include (FindSSE)/if(CMAKE_SYSTEM_ARCH MATCHES "amd64")\ninclude (FindSSE)\nendif()/' ../CMakeLists.txt && \
-  cmake \
+  cmake3.5 \
     -G"Unix Makefiles" \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_SYSTEM_ARCH=$(arch) \
@@ -895,6 +898,11 @@ RUN \
   tar $TAR_OPTS x265_git.tar.bz2 && cd x265_*/build/linux && \
   sed -i '/^cmake / s/$/ -G "Unix Makefiles" ${CMAKEFLAGS}/' ./multilib.sh && \
   sed -i 's/ -DENABLE_SHARED=OFF//g' ./multilib.sh && \
+  # https://bitbucket.org/multicoreware/x265_git/commits/b354c009a60bcd6d7fc04014e200a1ee9c45c167
+  sed -i 's/cmake_policy(SET CMP0025 OLD)/cmake_policy(SET CMP0025 NEW)/g' ../../source/CMakeLists.txt && \
+  sed -i 's/cmake_policy(SET CMP0054 OLD)/cmake_policy(SET CMP0054 NEW)/g' ../../source/CMakeLists.txt && \
+  # https://bitbucket.org/multicoreware/x265_git/issues/1008/build-fails-with-cmake-4
+  sed -i 's/cmake/cmake3.5/g' ./multilib.sh && \
   MAKEFLAGS="-j$(nproc)" \
   CMAKEFLAGS="-DENABLE_SHARED=OFF -DCMAKE_VERBOSE_MAKEFILE=ON -DENABLE_AGGRESSIVE_CHECKS=ON -DENABLE_NASM=ON -DCMAKE_BUILD_TYPE=Release" \
   ./multilib.sh && \
@@ -912,6 +920,8 @@ RUN \
   wget $WGET_OPTS -O xavs2.tar.gz "$XAVS2_URL" && \
   echo "$XAVS2_SHA256  xavs2.tar.gz" | sha256sum -c - && \
   tar $TAR_OPTS xavs2.tar.gz && cd xavs2-*/build/linux && \
+  # new gcc not happy with some of the code
+  CFLAGS="-Wno-incompatible-pointer-types -Wno-unused-function" \
   ./configure \
     --disable-asm \
     --enable-pic \
@@ -929,7 +939,8 @@ RUN \
   wget $WGET_OPTS -O libxvid.tar.gz "$XVID_URL" && \
   echo "$XVID_SHA256  libxvid.tar.gz" | sha256sum -c - && \
   tar $TAR_OPTS libxvid.tar.gz && cd xvidcore/build/generic && \
-  CFLAGS="$CFLAGS -fstrength-reduce -ffast-math" ./configure && \
+  # gnu18 to fix issue type own bool typedef
+  CFLAGS="$CFLAGS -std=gnu18 -fstrength-reduce -ffast-math" ./configure && \
   make -j$(nproc) && make install
 
 # bump: xeve /XEVE_VERSION=([\d.]+)/ https://github.com/mpeg5/xeve.git|*
@@ -969,7 +980,6 @@ RUN \
   echo "$XEVD_SHA256  xevd.tar.gz" | sha256sum -c - && \
   tar $TAR_OPTS xevd.tar.gz && cd xevd-* && \
   echo v$XEVD_VERSION > version.txt && \
-  sed -i 's/mc_filter_bilin/xevdm_mc_filter_bilin/' src_main/sse/xevdm_mc_sse.c && \
   mkdir build && cd build && \
   cmake \
     -G"Unix Makefiles" \
@@ -1055,9 +1065,9 @@ RUN \
 # bump: libva /LIBVA_VERSION=([\d.]+)/ https://github.com/intel/libva.git|^2
 # bump: libva after ./hashupdate Dockerfile LIBVA $LATEST
 # bump: libva link "Changelog" https://github.com/intel/libva/blob/master/NEWS
-ARG LIBVA_VERSION=2.23.0
+ARG LIBVA_VERSION=2.24.1
 ARG LIBVA_URL="https://github.com/intel/libva/archive/refs/tags/${LIBVA_VERSION}.tar.gz"
-ARG LIBVA_SHA256=b10aceb30e93ddf13b2030eb70079574ba437be9b3b76065caf28a72c07e23e7
+ARG LIBVA_SHA256=0b4a3649ee8d683b9cce2ef094df4fb039d276c0cef7e49337c43d3b297b9f42
 RUN \
   wget $WGET_OPTS -O libva.tar.gz "$LIBVA_URL" && \
   echo "$LIBVA_SHA256  libva.tar.gz" | sha256sum -c - && \
@@ -1077,9 +1087,9 @@ RUN \
 # bump: libvpl /LIBVPL_VERSION=([\d.]+)/ https://github.com/intel/libvpl.git|^2
 # bump: libvpl after ./hashupdate Dockerfile LIBVPL $LATEST
 # bump: libvpl link "Changelog" https://github.com/intel/libvpl/blob/main/CHANGELOG.md
-ARG LIBVPL_VERSION=2.16.0
+ARG LIBVPL_VERSION=2.17.0
 ARG LIBVPL_URL="https://github.com/intel/libvpl/archive/refs/tags/v${LIBVPL_VERSION}.tar.gz"
-ARG LIBVPL_SHA256=d60931937426130ddad9f1975c010543f0da99e67edb1c6070656b7947f633b6
+ARG LIBVPL_SHA256=4de3e2faf1e8307fb282e4a43f443191810f6a6b0a484fffa7995ba1c814c6ec
 RUN \
   wget $WGET_OPTS -O libvpl.tar.gz "$LIBVPL_URL" && \
   echo "$LIBVPL_SHA256  libvpl.tar.gz" | sha256sum -c - && \
