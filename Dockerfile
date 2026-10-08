@@ -110,6 +110,8 @@ RUN \
     -Ddefault_library=static \
     -Dlibmount=disabled && \
   ninja -j$(nproc) -vC build install
+# exported symbols keep rust thread locals as unresolved relocations that a static pie never applies
+RUN sed -i 's/-Wl,--export-dynamic//' /usr/local/lib/pkgconfig/gmodule-2.0.pc /usr/local/lib/pkgconfig/gmodule-export-2.0.pc
 
 # bump: harfbuzz /LIBHARFBUZZ_VERSION=([\d.]+)/ https://github.com/harfbuzz/harfbuzz.git|*
 # bump: harfbuzz after ./hashupdate Dockerfile LIBHARFBUZZ $LATEST
@@ -190,27 +192,29 @@ RUN \
   ninja -j$(nproc) -vC build install
 
 # build after libvmaf
-# bump: aom /AOM_VERSION=([\d.]+)/ git:https://aomedia.googlesource.com/aom|*
+# bump: aom /AOM_VERSION=([\d.]+)/ fetch:https://storage.googleapis.com/aom-releases/|/libaom-([\d.]+)\.tar\.gz/|*
 # bump: aom after ./hashupdate Dockerfile AOM $LATEST
-# bump: aom after COMMIT=$(git ls-remote https://aomedia.googlesource.com/aom v$LATEST^{} | awk '{print $1}') && sed -i -E "s/^ARG AOM_COMMIT=.*/ARG AOM_COMMIT=$COMMIT/" Dockerfile
 # bump: aom link "CHANGELOG" https://aomedia.googlesource.com/aom/+/refs/tags/v$LATEST/CHANGELOG
 ARG AOM_VERSION=3.15.1
-ARG AOM_URL="https://aomedia.googlesource.com/aom"
-ARG AOM_COMMIT=44d0a57786f432d933ff64b653347c66f4d0fa1d
+ARG AOM_URL="https://storage.googleapis.com/aom-releases/libaom-$AOM_VERSION.tar.gz"
+ARG AOM_SHA256=8ca0c52746174603500f0adb6f2a215d69c9ca2aab2acb3caa06fb791d8d01bf
 RUN \
-  git clone --depth 1 --branch v$AOM_VERSION "$AOM_URL" && \
-  cd aom && test $(git rev-parse HEAD) = $AOM_COMMIT && \
+  wget $WGET_OPTS -O aom.tar.gz "$AOM_URL" && \
+  echo "$AOM_SHA256  aom.tar.gz" | sha256sum -c - && \
+  tar $TAR_OPTS aom.tar.gz && cd libaom-* && \
   mkdir build_tmp && cd build_tmp && \
   cmake \
     -G"Unix Makefiles" \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_SHARED_LIBS=OFF \
+    -DENABLE_APPS=NO \
     -DENABLE_EXAMPLES=NO \
     -DENABLE_DOCS=NO \
     -DENABLE_TESTS=NO \
     -DENABLE_TOOLS=NO \
     -DCONFIG_TUNE_VMAF=1 \
+    -DCONFIG_LIBYUV=0 \
     -DENABLE_NASM=ON \
     -DCMAKE_INSTALL_LIBDIR=lib \
     .. && \
@@ -248,7 +252,7 @@ RUN \
     --enable-static && \
   make -j$(nproc) && make install
 
-# bump: libudfread /LIBUDFREAD_VERSION=([\d.]+)/ https://code.videolan.org/videolan/libudfread.git|*
+# bump: libudfread /LIBUDFREAD_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/libudfread/|/libudfread-([\d.]+)\.tar\.xz/|*
 # bump: libudfread after ./hashupdate Dockerfile LIBUDFREAD $LATEST
 # bump: libudfread link "Source diff $CURRENT..$LATEST" https://code.videolan.org/videolan/libudfread/-/compare/$CURRENT...$LATEST
 ARG LIBUDFREAD_VERSION=1.2.0
@@ -263,31 +267,31 @@ RUN \
     -Ddefault_library=static && \
   ninja -j$(nproc) -vC build install
 
-# bump: libbluray /LIBBLURAY_VERSION=([\d.]+)/ https://code.videolan.org/videolan/libbluray.git|*
+# bump: libbluray /LIBBLURAY_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/libbluray/last/|/libbluray-([\d.]+)\.tar\.xz/
 # bump: libbluray after ./hashupdate Dockerfile LIBBLURAY $LATEST
 # bump: libbluray link "ChangeLog" https://code.videolan.org/videolan/libbluray/-/blob/master/ChangeLog
 ARG LIBBLURAY_VERSION=1.5.0
-ARG LIBBLURAY_URL="https://code.videolan.org/videolan/libbluray/-/archive/$LIBBLURAY_VERSION/libbluray-$LIBBLURAY_VERSION.tar.gz"
-ARG LIBBLURAY_SHA256=7a5d945a9c2b0064a748b77a4c5ab563175bb7219e9d562b2b2399790726a388
+ARG LIBBLURAY_URL="https://download.videolan.org/pub/videolan/libbluray/$LIBBLURAY_VERSION/libbluray-$LIBBLURAY_VERSION.tar.xz"
+ARG LIBBLURAY_SHA256=f676408e91a5d321abf8b8d4dfdae36205c297dab5c54c3ec519639025f474a2
 RUN \
-  wget $WGET_OPTS -O libbluray.tar.gz "$LIBBLURAY_URL" && \
-  echo "$LIBBLURAY_SHA256  libbluray.tar.gz" | sha256sum -c - && \
-  tar $TAR_OPTS libbluray.tar.gz && cd libbluray-* && \
+  wget $WGET_OPTS -O libbluray.tar.xz "$LIBBLURAY_URL" && \
+  echo "$LIBBLURAY_SHA256  libbluray.tar.xz" | sha256sum -c - && \
+  tar $TAR_OPTS libbluray.tar.xz && cd libbluray-* && \
   meson setup build \
     -Dbuildtype=release \
     -Ddefault_library=static && \
   ninja -j$(nproc) -vC build install
 
-# bump: dav1d /DAV1D_VERSION=([\d.]+)/ https://code.videolan.org/videolan/dav1d.git|*
+# bump: dav1d /DAV1D_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/dav1d/last/|/dav1d-([\d.]+)\.tar\.xz/
 # bump: dav1d after ./hashupdate Dockerfile DAV1D $LATEST
 # bump: dav1d link "Release notes" https://code.videolan.org/videolan/dav1d/-/tags/$LATEST
 ARG DAV1D_VERSION=1.5.4
-ARG DAV1D_URL="https://code.videolan.org/videolan/dav1d/-/archive/$DAV1D_VERSION/dav1d-$DAV1D_VERSION.tar.gz"
-ARG DAV1D_SHA256=a1d5b63d2d38ec9bd03acf643caa51fa22edd1e89c5a109c4807717216bbec07
+ARG DAV1D_URL="https://download.videolan.org/pub/videolan/dav1d/$DAV1D_VERSION/dav1d-$DAV1D_VERSION.tar.xz"
+ARG DAV1D_SHA256=686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5
 RUN \
-  wget $WGET_OPTS -O dav1d.tar.gz "$DAV1D_URL" && \
-  echo "$DAV1D_SHA256  dav1d.tar.gz" | sha256sum -c - && \
-  tar $TAR_OPTS dav1d.tar.gz && cd dav1d-* && \
+  wget $WGET_OPTS -O dav1d.tar.xz "$DAV1D_URL" && \
+  echo "$DAV1D_SHA256  dav1d.tar.xz" | sha256sum -c - && \
+  tar $TAR_OPTS dav1d.tar.xz && cd dav1d-* && \
   meson setup build \
     -Dbuildtype=release \
     -Ddefault_library=static && \
