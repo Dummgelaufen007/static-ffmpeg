@@ -774,6 +774,7 @@ RUN \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DBUILD_SHARED_LIBS=OFF \
     -DBUILD_APPS=OFF \
+    -DSVT_AV1_LTO=OFF \
     -DENABLE_AVX512=ON \
     -DCMAKE_BUILD_TYPE=Release \
     .. && \
