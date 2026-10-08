@@ -5,7 +5,6 @@ set -xeo pipefail
 cd "$(dirname "$0")"
 
 DOCKERFILE=${1:?usage: $0 <dockerfile>}
-DOWNLOADS=downloads.${DOCKERFILE#Dockerfile.}
 
 docker buildx inspect ffbuilder &>/dev/null || docker buildx create \
     --bootstrap \
@@ -15,12 +14,9 @@ docker buildx inspect ffbuilder &>/dev/null || docker buildx create \
     --driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=-1 \
     --driver-opt env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
-if grep -q '^FROM .* AS downloader$' "$DOCKERFILE"; then
-    if [[ ! -d downloads ]]; then
-        bash download.sh Dockerfile.0.clean downloads
-    fi
-    cp -lrP downloads/. "$DOWNLOADS"
-    bash download.sh "$DOCKERFILE" "$DOWNLOADS"
+CACHE=
+if [[ -d downloads ]] && grep -q '^FROM .* AS downloader$' "$DOCKERFILE"; then
+    CACHE=downloads
 fi
 
 docker buildx build \
@@ -30,10 +26,8 @@ docker buildx build \
     ${HTTP_PROXY:+--build-arg http_proxy="$HTTP_PROXY"} \
     -t static-ffmpeg-fdk \
     --build-arg DOCKERFILE="$DOCKERFILE" \
-    --build-arg DOWNLOADS="$DOWNLOADS" \
+    ${CACHE:+--build-context downloads="$CACHE"} \
     -f "$DOCKERFILE" .
-
-rm -rf "$DOWNLOADS"
 
 docker buildx build \
     --build-arg CACHE_BUST="$(date +%s)" \

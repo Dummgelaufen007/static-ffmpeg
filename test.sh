@@ -33,13 +33,9 @@ for df in "${DOCKERFILES[@]}"; do
     log="$LOGDIR/$df.log"
 
     echo "=== $df -> $tag (Log: $log)"
-    dl="downloads.${df#Dockerfile.}"
-    if grep -q '^FROM .* AS downloader$' "$df"; then
-        if [[ ! -d downloads ]]; then
-            bash download.sh Dockerfile.0.clean downloads
-        fi
-        cp -lrP downloads/. "$dl"
-        bash download.sh "$df" "$dl"
+    cache=
+    if [[ -d downloads ]] && grep -q '^FROM .* AS downloader$' "$df"; then
+        cache=downloads
     fi
     start=$(date +%s)
     rc=0
@@ -51,11 +47,10 @@ for df in "${DOCKERFILES[@]}"; do
         --build-arg ENABLE_FDKAAC=1 \
         ${HTTP_PROXY:+--build-arg http_proxy="$HTTP_PROXY"} \
         --build-arg DOCKERFILE="$df" \
-        --build-arg DOWNLOADS="$dl" \
+        ${cache:+--build-context downloads="$cache"} \
         -t "$tag" \
         -f "$df" . 2>&1 | tee "$log" 2>&1 || rc=$?
     elapsed=$(($(date +%s) - start))
-    rm -rf "$dl"
 
     secs+=("$elapsed")
     rcs+=("$rc")
