@@ -28,10 +28,7 @@ clone() {
   local d="$dl_dir/$1"
   [[ -d "$d" ]] && return 0
   rm -rf "$d.tmp"
-  git init -q "$d.tmp"
-  git -C "$d.tmp" remote add origin "$2"
-  git -C "$d.tmp" fetch --depth=1 origin "$3"
-  git -C "$d.tmp" -c advice.detachedHead=false checkout --recurse-submodules FETCH_HEAD
+  sh ./git-mini-clone "$2" "$3" "$d.tmp"
   mv "$d.tmp" "$d"
 }
 

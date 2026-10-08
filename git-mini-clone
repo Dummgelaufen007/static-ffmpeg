@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+# Usage: git-mini-clone <URL> <COMMIT> <DIR>
+git init -q "$3"
+git -C "$3" fetch --depth=1 "$1" "$2"
+git -C "$3" -c advice.detachedHead=false checkout FETCH_HEAD
