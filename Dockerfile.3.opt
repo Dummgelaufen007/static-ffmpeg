@@ -3,7 +3,9 @@
 ARG ALPINE_VERSION=alpine:3.20.3
 FROM $ALPINE_VERSION AS downloader
 ARG APK_OPTS=""
-RUN apk add --no-cache $APK_OPTS bash wget git
+# over http, so a caching proxy passed as http_proxy can store the packages
+RUN ([ -z "$http_proxy" ] || sed -i 's|^https:|http:|' /etc/apk/repositories) && \
+  apk add --no-cache $APK_OPTS bash wget git
 ARG DOWNLOADS=downloads.3.opt
 COPY $DOWNLOADS/ /downloads/
 ARG DOCKERFILE=Dockerfile.3.opt
@@ -16,7 +18,8 @@ FROM $ALPINE_VERSION AS builder
 # Alpine Package Keeper options
 ARG APK_OPTS=""
 
-RUN apk add --no-cache $APK_OPTS \
+RUN ([ -z "$http_proxy" ] || sed -i 's|^https:|http:|' /etc/apk/repositories) && \
+  apk add --no-cache $APK_OPTS \
   coreutils \
   pkgconfig \
   wget \
@@ -721,6 +724,7 @@ RUN \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DBUILD_SHARED_LIBS=OFF \
     -DBUILD_APPS=OFF \
+    -DSVT_AV1_LTO=OFF \
     -DENABLE_AVX512=ON \
     -DCMAKE_BUILD_TYPE=Release \
     .. && \

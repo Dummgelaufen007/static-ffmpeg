@@ -2,6 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# wget reads only the lower-case name
+[[ -z ${HTTP_PROXY:-} ]] || export http_proxy="$HTTP_PROXY"
+
 dockerfile="${1:-Dockerfile.clean}"
 dl_dir="${2:-downloads}"
 

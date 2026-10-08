@@ -49,6 +49,7 @@ for df in "${DOCKERFILES[@]}"; do
         --no-cache \
         --progress=rawjson \
         --build-arg ENABLE_FDKAAC=1 \
+        ${HTTP_PROXY:+--build-arg http_proxy="$HTTP_PROXY"} \
         --build-arg DOCKERFILE="$df" \
         --build-arg DOWNLOADS="$dl" \
         -t "$tag" \

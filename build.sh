@@ -27,6 +27,7 @@ docker buildx build \
     --builder ffbuilder \
     --load \
     --build-arg ENABLE_FDKAAC=1 \
+    ${HTTP_PROXY:+--build-arg http_proxy="$HTTP_PROXY"} \
     -t static-ffmpeg-fdk \
     --build-arg DOCKERFILE="$DOCKERFILE" \
     --build-arg DOWNLOADS="$DOWNLOADS" \
