@@ -39,7 +39,7 @@ Not a build dependency: symbol collisions handled at link time (e.g. libzmq/libs
 4. **Every stage passes on what later stages read.** Libraries install into `/usr/local` so `.pc` prefixes stay valid after the merge; check non-standard installs (cargo cinstall, manual `cp`, symlinks).
 5. **`builder` stage.** `FROM base AS builder`, then one `COPY --link --from=<leaf>` per leaf build stage for what the `builder` reads, then download and build ffmpeg as in the original; chain members arrive through the last stage of their chain. The COPYs must precede the ffmpeg build so `./configure` finds the libraries. `--link` is safe here because the merges are additive and duplicate files from chains are identical.
 6. **versions.json.** Re-declare every version ARG the `jq` block reads via `env.*`; missing ones silently become `null`.
-7. **Keep unchanged:** `checkelf`, `checkdupsym`, the font `apk add`, the final stages, and the stage name `builder`.
+7. **Keep unchanged:** `checkelf`, the font `apk add`, the final stages, and the stage name `builder`.
 8. **Comment the non-obvious:** which chain links are hard and which are kept only for identical output, and why each stage has its parent.
 
 ## Step 3: x265 — parallel bit depths instead of multilib.sh
@@ -66,7 +66,7 @@ Report what could not be verified (the real build) in one line.
 ## Pitfalls
 
 - **Hidden hard dependencies.** Check every "independent" assumption against the build scripts, not the flag names (e.g. libjxl's `deps.sh` does not vendor lcms; the build fails with `Could NOT find LCMS2`).
-- **Only what is copied crosses stages.** Anything in `builder` that reads a source dir (e.g. `checkdupsym /ffmpeg-*`) works only because `builder` builds ffmpeg there.
+- **Only what is copied crosses stages.** Anything in `builder` that reads a source dir works only because `builder` builds ffmpeg there.
 - **Glob collisions.** Patterns like `cd ffmpeg*` or `cd libssh*` match both the tarball and the directory. This works in the upstream file; do not change these patterns.
 - **Oversubscription.** N parallel stages × `-j$(nproc)` each; cap it with BuildKit's max-parallelism if needed. Do not change `-j` values.
 - **Cheap syntax tests mislead.** Compiling configure-based C projects without their generated headers produces fatal errors that hide real ones. Only claim results for files that actually compiled.

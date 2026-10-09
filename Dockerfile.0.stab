@@ -194,6 +194,7 @@ RUN \
     -Dpixbuf=disabled \
     -Dpixbuf-loader=disabled \
     -Dvala=disabled \
+    -Drsvg-convert=disabled \
     -Dtests=false && \
   ninja -j$(nproc) -vC build install
 
@@ -575,7 +576,11 @@ RUN \
   tar $TAR_OPTS $RAV1E_FILE && cd rav1e-* && \
   RUSTFLAGS="-C target-feature=+crt-static" \
   CARGO_PROFILE_RELEASE_LTO=false \
-  cargo cinstall --library-type staticlib --release
+  CARGO_PROFILE_RELEASE_DEBUG=false \
+  cargo cinstall --release \
+    --library-type staticlib \
+    --no-default-features \
+    --features asm,threading,git_version,capi
 
 # bump: librtmp /LIBRTMP_COMMIT=([[:xdigit:]]+)/ gitrefs:https://git.ffmpeg.org/rtmpdump.git|re:#^refs/heads/master$#|@commit
 # bump: librtmp after ./hashupdate Dockerfile LIBRTMP $LATEST
@@ -1349,9 +1354,6 @@ RUN \
 RUN --mount=src=checkelf,dst=/checkelf \
   /checkelf /usr/local/bin/ffmpeg && \
   /checkelf /usr/local/bin/ffprobe
-# workaround for using -Wl,--allow-multiple-definition
-# see comment in checkdupsym for details
-RUN --mount=src=checkdupsym,dst=/checkdupsym /checkdupsym /ffmpeg-*
 
 # some basic fonts that don't take up much space
 RUN apk add $APK_OPTS font-terminus font-inconsolata font-dejavu font-awesome

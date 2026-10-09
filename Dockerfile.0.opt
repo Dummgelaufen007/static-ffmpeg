@@ -1370,7 +1370,7 @@ RUN \
   --enable-libzmq \
   --enable-openssl \
   || (cat ffbuild/config.log ; false) \
-  && set -o pipefail && make -j$(nproc) install-progs install-doc LDXX='$(CXX) -Wl,-t' | tee ld-trace.log
+  && make -j$(nproc) install-progs install-doc
 
 RUN \
   EXPAT_VERSION=$(pkg-config --modversion expat) \
@@ -1453,9 +1453,6 @@ RUN \
 RUN --mount=src=checkelf,dst=/checkelf \
   /checkelf /usr/local/bin/ffmpeg && \
   /checkelf /usr/local/bin/ffprobe
-# workaround for using -Wl,--allow-multiple-definition
-# see comment in checkdupsym for details
-RUN --mount=src=checkdupsym.opt,dst=/checkdupsym /checkdupsym /ffmpeg-*
 
 # some basic fonts that don't take up much space
 RUN apk add $APK_OPTS font-terminus font-inconsolata font-dejavu font-awesome
