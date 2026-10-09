@@ -57,6 +57,13 @@ for df in "${DOCKERFILES[@]}"; do
 
     if [[ $rc -eq 0 ]]; then
         echo "    ok   $(fmt "$elapsed")"
+        docker buildx build \
+            --build-arg IMAGE="$tag" \
+            --build-arg VARIANT="$df" \
+            --build-arg CACHE_BUST="$(date +%s)" \
+            --target export \
+            --output type=local,dest="$LOGDIR" \
+            -f export . || echo "    Export FEHLGESCHLAGEN (rc=$?)"
     else
         echo "    FEHLGESCHLAGEN (rc=$rc) nach $(fmt "$elapsed"), letzte Zeilen:"
         tail -n 20 "$log" | sed 's/^/    | /'

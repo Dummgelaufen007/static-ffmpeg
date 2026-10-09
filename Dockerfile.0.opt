@@ -619,6 +619,7 @@ RUN \
   echo "$RAV1E_SHA256  $RAV1E_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $RAV1E_FILE && cd rav1e-* && \
   RUSTFLAGS="-C target-feature=+crt-static" \
+  CARGO_PROFILE_RELEASE_LTO=false \
   CARGO_PROFILE_RELEASE_DEBUG=false \
   cargo cinstall --release \
     --library-type staticlib \
@@ -633,7 +634,7 @@ ARG LIBRTMP_COMMIT=138fdb258d9fc26f1843fd1b891180416c9dc575
 RUN \
   git clone "$LIBRTMP_URL" && cd rtmpdump && \
   git checkout --recurse-submodules $LIBRTMP_COMMIT && \
-  make -C librtmp SYS=posix SHARED=off -j$(nproc) install
+  make -C librtmp SYS=posix SHARED=off XCFLAGS="$CFLAGS" OPT= -j$(nproc) install
 
 # bump: rubberband /RUBBERBAND_VERSION=([\d.]+)/ https://github.com/breakfastquay/rubberband.git|^2
 # bump: rubberband after ./hashupdate Dockerfile RUBBERBAND $LATEST
@@ -668,6 +669,7 @@ RUN \
   echo "$LIBSHINE_SHA256  $LIBSHINE_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $LIBSHINE_FILE && cd shine-* && \
   sed -i 's/shine_mdct_initialise()/shine_mdct_initialise(shine_global_config *config)/' src/lib/l3mdct.h && \
+  sed -i '/^CFLAGS = /s/ -O2//' Makefile.in && \
   ./configure \
     --disable-dependency-tracking \
     --with-pic \
@@ -1289,9 +1291,6 @@ ARG ENABLE_FDKAAC=
 # ldflags stack-size=2097152 is to increase default stack size from 128KB (musl default) to something
 # more similar to glibc (2MB). This fixing segfault with libaom-av1 and libsvtav1 as they seems to pass
 # large things on the stack.
-#
-# ldfalgs -Wl,--allow-multiple-definition is a workaround for linking with multiple rust staticlib to
-# not cause collision in toolchain symbols, see comment in checkdupsym script for details.
 RUN \
   wget -O $FFMPEG_FILE $WGET_OPTS "$FFMPEG_URL" && \
   echo "$FFMPEG_SHA256  $FFMPEG_FILE" | sha256sum -c - && \
@@ -1301,7 +1300,7 @@ RUN \
   ./configure \
   --pkg-config-flags="--static" \
   --extra-cflags="-fopenmp" \
-  --extra-ldflags="-fopenmp -Wl,--allow-multiple-definition -Wl,-z,stack-size=2097152" \
+  --extra-ldflags="-fopenmp -Wl,-z,stack-size=2097152" \
   --toolchain=hardened \
   --disable-debug \
   --disable-shared \

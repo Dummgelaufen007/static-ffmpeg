@@ -1,4 +1,6 @@
-FROM static-ffmpeg-fdk AS ffmpeg
+ARG IMAGE=static-ffmpeg-fdk
+
+FROM $IMAGE AS ffmpeg
 
 FROM alpine:3.20.3 AS packager
 
@@ -7,13 +9,14 @@ RUN apk add --no-cache tar xz
 COPY --from=ffmpeg / /data
 
 ARG CACHE_BUST
+ARG VARIANT=
 
-RUN DATE="$(date +%y%m%d_%H%M%S)" && \
-    mv /data "/ffmpeg-${DATE}" && \
+RUN NAME="ffmpeg-$(date +%y%m%d_%H%M%S)${VARIANT:+-$VARIANT}" && \
+    mv /data "/${NAME}" && \
     tar -I "xz -T0" \
-        -cf "/ffmpeg-${DATE}.tar.xz" \
+        -cf "/${NAME}.tar.xz" \
         -C / \
-        "ffmpeg-${DATE}"
+        "${NAME}"
 
 FROM scratch AS export
 
