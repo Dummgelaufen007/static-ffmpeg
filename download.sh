@@ -22,7 +22,7 @@ fetch() {
   if [[ -f "$f" ]] && echo "$3  $f" | sha256sum -c - >/dev/null 2>&1; then
     return 0
   fi
-  wget -O "$f.tmp" $WGET_OPTS "$2"
+  wget -O "$f.tmp" -q --show-progress $WGET_OPTS "$2"
   echo "$3  $f.tmp" | sha256sum -c -
   mv "$f.tmp" "$f"
 }
