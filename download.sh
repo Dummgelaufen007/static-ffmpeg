@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 [[ -z ${HTTP_PROXY:-} ]] || export http_proxy="$HTTP_PROXY"
 
 dockerfile="${1:-Dockerfile.clean}"
-dl_dir="${2:-downloads}"
+dl_dir="${2:-dl-cache}"
 
 if ! [[ -f $dockerfile ]]; then
   echo "dockerfile not found: $dockerfile" >&2

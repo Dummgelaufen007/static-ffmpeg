@@ -15,8 +15,8 @@ docker buildx inspect ffbuilder &>/dev/null || docker buildx create \
     --driver-opt env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
 CACHE=
-if [[ -d downloads ]] && grep -q '^FROM .* AS downloader$' "$DOCKERFILE"; then
-    CACHE=downloads
+if [[ -d dl-cache ]] && grep -q '^FROM .* AS downloader$' "$DOCKERFILE"; then
+    CACHE=dl-cache
 fi
 
 docker buildx build \

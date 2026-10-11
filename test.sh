@@ -34,8 +34,8 @@ for df in "${DOCKERFILES[@]}"; do
 
     echo "=== $df -> $tag (Log: $log)"
     cache=
-    if [[ -d downloads ]] && grep -q '^FROM .* AS downloader$' "$df"; then
-        cache=downloads
+    if [[ -d dl-cache ]] && grep -q '^FROM .* AS downloader$' "$df"; then
+        cache=dl-cache
     fi
     start=$(date +%s)
     rc=0
