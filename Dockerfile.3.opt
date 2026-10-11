@@ -66,7 +66,6 @@ RUN apk add --no-cache $APK_OPTS \
   python3 py3-packaging \
   linux-headers \
   curl \
-  libdrm-dev \
   pcre2-dev pcre2-static libffi-dev musl-libintl \
   pixman-dev pixman-static
 
@@ -131,6 +130,7 @@ RUN \
     -Ddefault_library=static \
     -Dtests=false \
     -Dsysprof=disabled \
+    -Dglib_debug=disabled \
     -Dlibmount=disabled && \
   # only the targets with the install tags devel and bin-devel: libraries, headers, .pc files and build tools
   ninja -j$(nproc) -vC build $(jq -r --arg b "$PWD/build/" '.targets | to_entries[] | select(.value.tag == "devel" or .value.tag == "bin-devel") | .key | ltrimstr($b)' build/meson-info/intro-install_plan.json) && \
@@ -200,6 +200,23 @@ RUN \
   ninja -j$(nproc) -vC build $(jq -r --arg b "$PWD/build/" '.targets | to_entries[] | select(.value.tag == "devel" or .value.tag == "bin-devel") | .key | ltrimstr($b)' build/meson-info/intro-install_plan.json) && \
   meson install -C build --no-rebuild --tags devel,bin-devel
 
+# before librsvg, which uses it for avif
+# bump: dav1d /DAV1D_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/dav1d/last/|/dav1d-([\d.]+)\.tar\.xz/
+# bump: dav1d after ./hashupdate Dockerfile DAV1D $LATEST
+# bump: dav1d link "Release notes" https://code.videolan.org/videolan/dav1d/-/tags/$LATEST
+ARG DAV1D_VERSION=1.5.4
+ARG DAV1D_URL="https://download.videolan.org/pub/videolan/dav1d/$DAV1D_VERSION/dav1d-$DAV1D_VERSION.tar.xz"
+ARG DAV1D_FILE="dav1d.$DAV1D_VERSION.tar.xz"
+ARG DAV1D_SHA256=686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5
+RUN \
+  tar $TAR_OPTS $DAV1D_FILE && cd dav1d-* && \
+  meson setup build \
+    -Dbuildtype=release \
+    -Ddefault_library=static \
+    -Denable_tools=false \
+    -Denable_tests=false && \
+  ninja -j$(nproc) -vC build install
+
 # bump: librsvg /LIBRSVG_VERSION=([\d.]+)/ https://gitlab.gnome.org/GNOME/librsvg.git|^2
 # bump: librsvg after ./hashupdate Dockerfile LIBRSVG $LATEST
 # bump: librsvg link "NEWS" https://gitlab.gnome.org/GNOME/librsvg/-/blob/master/NEWS
@@ -215,6 +232,7 @@ RUN \
     -Dbuildtype=release \
     -Ddefault_library=static \
     -Ddocs=disabled \
+    -Davif=enabled \
     -Dintrospection=disabled \
     -Dpixbuf=disabled \
     -Dpixbuf-loader=disabled \
@@ -233,6 +251,8 @@ ARG AOM_FILE="aom.$AOM_VERSION.tar.gz"
 ARG AOM_SHA256=8ca0c52746174603500f0adb6f2a215d69c9ca2aab2acb3caa06fb791d8d01bf
 RUN \
   tar $TAR_OPTS $AOM_FILE && cd libaom-* && \
+  # tune=vmaf without vmaf-model-path falls back to the model built into libvmaf
+  sed -i 's/^    vmaf_fatal_error("Failed to load VMAF model.");/    if (vmaf_model_load(vmaf_model, \&model_cfg, "vmaf_v0.6.1")) &/' aom_dsp/vmaf.c && \
   mkdir build_tmp && cd build_tmp && \
   cmake \
     -G"Unix Makefiles" \
@@ -260,15 +280,42 @@ ARG LIBARIBB24_VERSION=1.0.3
 ARG LIBARIBB24_URL="https://github.com/nkoriyama/aribb24/archive/v$LIBARIBB24_VERSION.tar.gz"
 ARG LIBARIBB24_FILE="libaribb24.$LIBARIBB24_VERSION.tar.gz"
 ARG LIBARIBB24_SHA256=f61560738926e57f9173510389634d8c06cabedfa857db4b28fb7704707ff128
+# decoder fixes of the open upstream pull requests 12, 13 and 17
+ARG LIBARIBB24_PR12_URL="https://github.com/nkoriyama/aribb24/commit/a5bcc6d17c20e18bdeec295089cc0cdfac9d35c8.patch"
+ARG LIBARIBB24_PR12_FILE="libaribb24.pr12.patch"
+ARG LIBARIBB24_PR12_SHA256=9059639e9577b123ac4ab3b53771e947b791c42d07b0444cf90e82f563d6d261
+ARG LIBARIBB24_PR13_URL="https://github.com/nkoriyama/aribb24/commit/facc51923d43f26dec09a9391566de7cba29f8db.patch"
+ARG LIBARIBB24_PR13_FILE="libaribb24.pr13.patch"
+ARG LIBARIBB24_PR13_SHA256=4812661f1c77ec06a5a12548f166ac8646d4c7c1574848a005f0578f3d8cfc7c
+ARG LIBARIBB24_PR17_URL="https://github.com/nkoriyama/aribb24/commit/58a34b8fabf4d0e9e1984fb603a97f52fb934a09.patch"
+ARG LIBARIBB24_PR17_FILE="libaribb24.pr17.patch"
+ARG LIBARIBB24_PR17_SHA256=1a4fc77f677a6ff87d024e3a218186160b23620c84dbd791ec5c425de0a8e6c2
 RUN \
   mkdir libaribb24 && \
   tar $TAR_OPTS $LIBARIBB24_FILE -C libaribb24 --strip-components=1 && cd libaribb24 && \
+  for p in $LIBARIBB24_PR12_FILE $LIBARIBB24_PR13_FILE $LIBARIBB24_PR17_FILE; do patch -p1 < ../$p || exit 1; done && \
   autoreconf -fiv && \
   ./configure \
     --disable-dependency-tracking \
     --enable-static \
     --disable-shared && \
   make -j$(nproc) && make install
+
+# before libass, which uses it for unicode line breaking; alpine has no static build
+# bump: libunibreak /LIBUNIBREAK_VERSION=([\d.]+)/ gitrefs:https://github.com/adah1972/libunibreak.git|re:#^refs/tags/libunibreak_(\d+)_(\d+)$#${1}.${2}#|*
+# bump: libunibreak after sed -i -E "s#/libunibreak_[0-9_]+/#/libunibreak_$(echo $LATEST | tr . _)/#" Dockerfile && ./hashupdate Dockerfile LIBUNIBREAK $LATEST
+# bump: libunibreak link "NEWS" https://github.com/adah1972/libunibreak/blob/master/NEWS
+ARG LIBUNIBREAK_VERSION=8.0
+ARG LIBUNIBREAK_URL="https://github.com/adah1972/libunibreak/releases/download/libunibreak_8_0/libunibreak-$LIBUNIBREAK_VERSION.tar.gz"
+ARG LIBUNIBREAK_FILE="libunibreak.$LIBUNIBREAK_VERSION.tar.gz"
+ARG LIBUNIBREAK_SHA256=9c4fad6e517338a098373acc9f35579ae2c325e6446666fb9ac2666ba15ceba4
+RUN \
+  tar $TAR_OPTS $LIBUNIBREAK_FILE && cd libunibreak-* && \
+  ./configure \
+    --disable-dependency-tracking \
+    --disable-shared \
+    --enable-static && \
+  make -j$(nproc) install
 
 # bump: libass /LIBASS_VERSION=([\d.]+)/ https://github.com/libass/libass.git|*
 # bump: libass after ./hashupdate Dockerfile LIBASS $LATEST
@@ -281,6 +328,7 @@ RUN \
   tar $TAR_OPTS $LIBASS_FILE && cd libass-* && \
   ./configure \
     --disable-dependency-tracking \
+    --enable-libunibreak \
     --disable-shared \
     --enable-static && \
   make -j$(nproc) && make install
@@ -315,22 +363,6 @@ RUN \
     -Dfreetype=disabled && \
   ninja -j$(nproc) -vC build install
 
-# bump: dav1d /DAV1D_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/dav1d/last/|/dav1d-([\d.]+)\.tar\.xz/
-# bump: dav1d after ./hashupdate Dockerfile DAV1D $LATEST
-# bump: dav1d link "Release notes" https://code.videolan.org/videolan/dav1d/-/tags/$LATEST
-ARG DAV1D_VERSION=1.5.4
-ARG DAV1D_URL="https://download.videolan.org/pub/videolan/dav1d/$DAV1D_VERSION/dav1d-$DAV1D_VERSION.tar.xz"
-ARG DAV1D_FILE="dav1d.$DAV1D_VERSION.tar.xz"
-ARG DAV1D_SHA256=686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5
-RUN \
-  tar $TAR_OPTS $DAV1D_FILE && cd dav1d-* && \
-  meson setup build \
-    -Dbuildtype=release \
-    -Ddefault_library=static \
-    -Denable_tools=false \
-    -Denable_tests=false && \
-  ninja -j$(nproc) -vC build install
-
 # bump: davs2 /DAVS2_VERSION=([\d.]+)/ https://github.com/pkuvcl/davs2.git|^1
 # bump: davs2 after ./hashupdate Dockerfile DAVS2 $LATEST
 # bump: davs2 link "Release" https://github.com/pkuvcl/davs2/releases/tag/$LATEST
@@ -339,11 +371,11 @@ ARG DAVS2_VERSION=1.7
 ARG DAVS2_URL="https://github.com/pkuvcl/davs2/archive/refs/tags/$DAVS2_VERSION.tar.gz"
 ARG DAVS2_FILE="davs2.$DAVS2_VERSION.tar.gz"
 ARG DAVS2_SHA256=b697d0b376a1c7f7eda3a4cc6d29707c8154c4774358303653f0a9727f923cc8
-# TODO: seems to be issues with asm on musl
 RUN \
   tar $TAR_OPTS $DAVS2_FILE && cd davs2-*/build/linux && \
+  # the source has assembler for x86 only
   ./configure \
-    --disable-asm \
+    $([ "$(arch)" = x86_64 ] || echo --disable-asm) \
     --enable-pic \
     --enable-strip \
     --disable-cli && \
@@ -444,6 +476,8 @@ ARG MP3LAME_FILE="mp3lame.$MP3LAME_VERSION.tar.gz"
 ARG MP3LAME_SHA256=ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e
 RUN \
   tar $TAR_OPTS $MP3LAME_FILE && cd lame-* && \
+  # configure never sets NDEBUG, the encoder is full of asserts
+  CFLAGS="$CFLAGS -DNDEBUG" \
   ./configure \
     --disable-dependency-tracking \
     --disable-shared \
@@ -674,7 +708,7 @@ RUN \
     -DENABLE_APPS=OFF \
     -DENABLE_CXX11=ON \
     -DUSE_STATIC_LIBSTDCXX=ON \
-    -DOPENSSL_USE_STATIC_LIBS=ON \
+    -DSRT_USE_OPENSSL_STATIC_LIBS=ON \
     -DENABLE_LOGGING=OFF \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_INSTALL_INCLUDEDIR=include \
@@ -700,7 +734,6 @@ RUN \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_BUILD_TYPE=Release \
-    -DPICKY_DEVELOPER=ON \
     -DBUILD_SHARED_LIBS=OFF \
     -DWITH_GSSAPI=OFF \
     -DWITH_BLOWFISH_CIPHER=ON \
@@ -802,7 +835,7 @@ ARG UAVS3D_VERSION=1.2
 ARG UAVS3D_URL="https://github.com/uavs3/uavs3d/archive/refs/tags/$UAVS3D_VERSION.tar.gz"
 ARG UAVS3D_FILE="uavs3d.$UAVS3D_VERSION.tar.gz"
 ARG UAVS3D_SHA256=faa1f1f82badc0603d9944bb5af7b961dd42236e2c3a7aa8fcfc080bbeb5b157
-# Removes BIT_DEPTH 10 to be able to build on other platforms. 10 was overkill anyways.
+# the 8 bit build rejects 10 bit streams
 RUN \
   tar $TAR_OPTS $UAVS3D_FILE && cd uavs3d-* && \
   mkdir build/linux && cd build/linux && \
@@ -811,6 +844,7 @@ RUN \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_SHARED_LIBS=OFF \
+    -DCOMPILE_10BIT=1 \
     -DCMAKE_SKIP_INSTALL_ALL_DEPENDENCY=ON \
     ../.. && \
   make -j$(nproc) uavs3d && \
@@ -932,8 +966,11 @@ RUN \
   tar $TAR_OPTS $X265_FILE && cd x265_*/build/linux && \
   sed -i '/^cmake / s/$/ -G "Unix Makefiles" ${CMAKEFLAGS}/' ./multilib.sh && \
   sed -i 's/ -DENABLE_SHARED=OFF//g' ./multilib.sh && \
+  # hdr10+ for the 10 and 12 bit builds only, 8 bit has no use for it
+  sed -i 's/-DHIGH_BIT_DEPTH=ON/& -DENABLE_HDR10_PLUS=ON/' ./multilib.sh && \
+  sed -i '1i #include <cstdint>' ../../source/dynamicHDR10/json11/json11.cpp && \
   MAKEFLAGS="-j$(nproc)" \
-  CMAKEFLAGS="-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DCMAKE_VERBOSE_MAKEFILE=ON -DENABLE_AGGRESSIVE_CHECKS=ON -DCMAKE_BUILD_TYPE=Release" \
+  CMAKEFLAGS="-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DENABLE_ALPHA=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release" \
   ./multilib.sh && \
   make -C 8bit -j$(nproc) install
 
@@ -945,13 +982,13 @@ ARG XAVS2_VERSION=1.4
 ARG XAVS2_URL="https://github.com/pkuvcl/xavs2/archive/refs/tags/$XAVS2_VERSION.tar.gz"
 ARG XAVS2_FILE="xavs2.$XAVS2_VERSION.tar.gz"
 ARG XAVS2_SHA256=1e6d731cd64cb2a8940a0a3fd24f9c2ac3bb39357d802432a47bc20bad52c6ce
-# TODO: seems to be issues with asm on musl
 RUN \
   tar $TAR_OPTS $XAVS2_FILE && cd xavs2-*/build/linux && \
   # new gcc not happy with some of the code
   CFLAGS="$CFLAGS -Wno-incompatible-pointer-types -Wno-unused-function" \
+  # the source has assembler for x86 only
   ./configure \
-    --disable-asm \
+    $([ "$(arch)" = x86_64 ] || echo --disable-asm) \
     --enable-pic \
     --disable-cli && \
   make -j$(nproc) install
@@ -977,11 +1014,10 @@ RUN \
 # bump: xeve after ./hashupdate Dockerfile XEVE $LATEST
 # bump: xeve link "CHANGELOG" https://github.com/mpeg5/xeve/releases/tag/v$LATEST
 # TODO: better -DARM? possible to build on non arm and intel?
-# TODO: report upstream about lib/libxeve.a?
-ARG XEVE_VERSION=0.7.0
+ARG XEVE_VERSION=0.7.1
 ARG XEVE_URL="https://github.com/mpeg5/xeve/archive/refs/tags/v$XEVE_VERSION.tar.gz"
 ARG XEVE_FILE="xeve.$XEVE_VERSION.tar.gz"
-ARG XEVE_SHA256=f60950d063f52adf11ed7196c0bbb0503fa107b0e43af06bdc81fecc24f2a62e
+ARG XEVE_SHA256=5d1249212f431816b4723937c9ec8491b45ee1bb75c0f46692deaf7f59fbf19c
 RUN \
   tar $TAR_OPTS $XEVE_FILE && \
   cd xeve-* && \
@@ -997,18 +1033,16 @@ RUN \
   make -j$(nproc) xeve && \
   install -D -m644 src_main/libxeve.a /usr/local/lib/xeve/libxeve.a && \
   install -D -m644 -t /usr/local/include/xeve ../inc/xeve.h xeve_exports.h && \
-  install -D -m644 xeve.pc /usr/local/lib/pkgconfig/xeve.pc && \
-  ln -s /usr/local/lib/xeve/libxeve.a /usr/local/lib/libxeve.a
+  install -D -m644 xeve.pc /usr/local/lib/pkgconfig/xeve.pc
 
 # bump: xevd /XEVD_VERSION=([\d.]+)/ https://github.com/mpeg5/xevd.git|*
 # bump: xevd after ./hashupdate Dockerfile XEVD $LATEST
 # bump: xevd link "CHANGELOG" https://github.com/mpeg5/xevd/releases/tag/v$LATEST
 # TODO: better -DARM? possible to build on non arm and intel?
-# TODO: report upstream about lib/libxevd.a?
-ARG XEVD_VERSION=0.7.0
+ARG XEVD_VERSION=0.8.0
 ARG XEVD_URL="https://github.com/mpeg5/xevd/archive/refs/tags/v$XEVD_VERSION.tar.gz"
 ARG XEVD_FILE="xevd.$XEVD_VERSION.tar.gz"
-ARG XEVD_SHA256=febfdb532819bbf36b1b04e74d3ef328ad0f0f2db6224ddb7640fce6bd0014f4
+ARG XEVD_SHA256=258d626fbb6c7ea1677b4fb0ffed3eaca2ec312810d6a76f67359fdc16068472
 RUN \
   tar $TAR_OPTS $XEVD_FILE && cd xevd-* && \
   echo v$XEVD_VERSION > version.txt && \
@@ -1022,8 +1056,7 @@ RUN \
   make -j$(nproc) xevd && \
   install -D -m644 src_main/libxevd.a /usr/local/lib/xevd/libxevd.a && \
   install -D -m644 -t /usr/local/include/xevd ../inc/xevd.h xevd_exports.h && \
-  install -D -m644 xevd.pc /usr/local/lib/pkgconfig/xevd.pc && \
-  ln -s /usr/local/lib/xevd/libxevd.a /usr/local/lib/libxevd.a
+  install -D -m644 xevd.pc /usr/local/lib/pkgconfig/xevd.pc
 
 # bump: zimg /ZIMG_VERSION=([\d.]+)/ https://github.com/sekrit-twc/zimg.git|*
 # bump: zimg after ./hashupdate Dockerfile ZIMG $LATEST
@@ -1122,51 +1155,8 @@ RUN \
     --enable-static && \
   make -j$(nproc) install
 
-# requires libdrm
-# bump: libva /LIBVA_VERSION=([\d.]+)/ https://github.com/intel/libva.git|^2
-# bump: libva after ./hashupdate Dockerfile LIBVA $LATEST
-# bump: libva link "Changelog" https://github.com/intel/libva/blob/master/NEWS
-ARG LIBVA_VERSION=2.24.1
-ARG LIBVA_URL="https://github.com/intel/libva/archive/refs/tags/${LIBVA_VERSION}.tar.gz"
-ARG LIBVA_FILE="libva.$LIBVA_VERSION.tar.gz"
-ARG LIBVA_SHA256=0b4a3649ee8d683b9cce2ef094df4fb039d276c0cef7e49337c43d3b297b9f42
-RUN \
-  tar $TAR_OPTS $LIBVA_FILE && cd libva-* && \
-  meson setup build \
-    -Dbuildtype=release \
-    -Ddefault_library=static \
-    -Ddisable_drm=false \
-    -Dwith_x11=no \
-    -Dwith_glx=no \
-    -Dwith_wayland=no \
-    -Dwith_win32=no \
-    -Dwith_legacy=[] \
-    -Denable_docs=false && \
-  ninja -j$(nproc) -vC build install
-
-# bump: libvpl /LIBVPL_VERSION=([\d.]+)/ https://github.com/intel/libvpl.git|^2
-# bump: libvpl after ./hashupdate Dockerfile LIBVPL $LATEST
-# bump: libvpl link "Changelog" https://github.com/intel/libvpl/blob/main/CHANGELOG.md
-ARG LIBVPL_VERSION=2.17.0
-ARG LIBVPL_URL="https://github.com/intel/libvpl/archive/refs/tags/v${LIBVPL_VERSION}.tar.gz"
-ARG LIBVPL_FILE="libvpl.$LIBVPL_VERSION.tar.gz"
-ARG LIBVPL_SHA256=4de3e2faf1e8307fb282e4a43f443191810f6a6b0a484fffa7995ba1c814c6ec
-RUN \
-  tar $TAR_OPTS $LIBVPL_FILE && cd libvpl-* && \
-  cmake -B build \
-    -G"Unix Makefiles" \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
-    -DCMAKE_INSTALL_LIBDIR=lib \
-    -DCMAKE_INSTALL_PREFIX=/usr/local \
-    -DBUILD_SHARED_LIBS=OFF \
-    -DBUILD_TESTS=OFF \
-    -DINSTALL_EXAMPLES=OFF \
-    -DENABLE_WARNING_AS_ERROR=ON && \
-  cmake --build build -j$(nproc) && \
-  cmake --install build
-# not sure why this is needed, used to work
-RUN sed -i 's/-lvpl /-lvpl -lstdc++ /' /usr/local/lib/pkgconfig/vpl.pc
+# libva and libvpl are not built: libva 2.24.1 only builds shared libraries, so the static link drops vaapi,
+# qsv has no device without vaapi, and a static musl binary cannot dlopen the drivers either way
 
 # bump: vvenc /VVENC_VERSION=([\d.]+)/ https://github.com/fraunhoferhhi/vvenc.git|*
 # bump: vvenc after ./hashupdate Dockerfile VVENC $LATEST
@@ -1265,7 +1255,6 @@ RUN \
   --enable-libvmaf \
   --enable-libvo-amrwbenc \
   --enable-libvorbis \
-  --enable-libvpl \
   --enable-libvpx \
   --enable-libvvenc \
   --enable-libwebp \
@@ -1337,13 +1326,12 @@ RUN \
   libsvtav1: env.SVTAV1_VERSION, \
   libtheora: env.THEORA_VERSION, \
   libtwolame: env.TWOLAME_VERSION, \
+  libunibreak: env.LIBUNIBREAK_VERSION, \
   libuavs3d: env.UAVS3D_VERSION, \
-  libva: env.LIBVA_VERSION, \
   libvidstab: env.VIDSTAB_VERSION, \
   libvmaf: env.VMAF_VERSION, \
   libvo_amrwbenc: env.LIBVO_AMRWBENC_VERSION, \
   libvorbis: env.VORBIS_VERSION, \
-  libvpl: env.LIBVPL_VERSION, \
   libvpx: env.VPX_VERSION, \
   libvvenc: env.VVENC_VERSION, \
   libwebp: env.LIBWEBP_VERSION, \
@@ -1360,9 +1348,25 @@ RUN \
   }' > /versions.json
 
 # make sure binaries has no dependencies, is relro, pie and stack nx
-RUN --mount=src=checkelf,dst=/checkelf \
-  /checkelf /usr/local/bin/ffmpeg && \
-  /checkelf /usr/local/bin/ffprobe
+RUN \
+  for f in /usr/local/bin/ffmpeg /usr/local/bin/ffprobe; do \
+    NOEXTLIBS=$(test "$(ldd "$f" | wc -l)" -eq 1 && echo yes || echo no) && \
+    RELRO=$(readelf -l "$f" | grep -q GNU_RELRO && echo yes || echo no) && \
+    BIND_NOW=$(readelf -d "$f" | grep -q BIND_NOW && echo yes || echo no) && \
+    PIE=$(readelf -h "$f" | grep -q DYN && echo yes || echo no) && \
+    STACKNX=$(readelf -W -l "$f" | grep GNU_STACK | grep -q -v RWE && echo yes || echo no) && \
+    file "$f" && \
+    echo "No external libs: $NOEXTLIBS" && \
+    echo "Relocate read-only: $RELRO" && \
+    echo "Resolve at startup: $BIND_NOW" && \
+    echo "Position independent code: $PIE" && \
+    echo "Stack non-executable: $STACKNX" && \
+    [ "$NOEXTLIBS" = "yes" ] && \
+    [ "$RELRO" = "yes" ] && \
+    [ "$BIND_NOW" = "yes" ] && \
+    [ "$PIE" = "yes" ] && \
+    [ "$STACKNX" = "yes" ] || exit 1; \
+  done
 
 # some basic fonts that don't take up much space
 RUN apk add $APK_OPTS font-terminus font-inconsolata font-dejavu font-awesome
@@ -1386,8 +1390,8 @@ RUN ["/ffmpeg", "-hide_banner", "-buildconf"]
 RUN ["/ffmpeg", "-f", "lavfi", "-i", "testsrc", "-c:v", "libsvtav1", "-t", "100ms", "-f", "null", "-"]
 # dns
 RUN ["/ffprobe", "-i", "https://github.com/favicon.ico"]
-# tls/https certs
-RUN ["/ffprobe", "-tls_verify", "1", "-ca_file", "/etc/ssl/cert.pem", "-i", "https://github.com/favicon.ico"]
+# tls/https certs and check that -tls_verify 1 is default in 9.0
+RUN ["/ffprobe", "-ca_file", "/etc/ssl/cert.pem", "-i", "https://github.com/favicon.ico"]
 # svg
 RUN ["/ffprobe", "-i", "https://github.githubassets.com/favicons/favicon.svg"]
 # vvenc

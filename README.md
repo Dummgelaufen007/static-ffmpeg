@@ -16,20 +16,20 @@ Use `mwader/static-ffmpeg` from [Docker Hub](https://hub.docker.com/r/mwader/sta
 
 In Dockerfile
 ```Dockerfile
-COPY --from=mwader/static-ffmpeg:9.0.2 /ffmpeg /usr/local/bin/
-COPY --from=mwader/static-ffmpeg:9.0.2 /ffprobe /usr/local/bin/
+COPY --from=mwader/static-ffmpeg:9.0.2-1 /ffmpeg /usr/local/bin/
+COPY --from=mwader/static-ffmpeg:9.0.2-1 /ffprobe /usr/local/bin/
 ```
 
 Run directly
 ```sh
-docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" mwader/static-ffmpeg:9.0.2 -i file.wav file.mp3
-docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" --entrypoint=/ffprobe mwader/static-ffmpeg:9.0.2 -i file.wav
+docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" mwader/static-ffmpeg:9.0.2-1 -i file.wav file.mp3
+docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" --entrypoint=/ffprobe mwader/static-ffmpeg:9.0.2-1 -i file.wav
 ```
 
 As shell alias
 ```sh
-alias ffmpeg='docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" mwader/static-ffmpeg:9.0.2'
-alias ffprobe='docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" --entrypoint=/ffprobe mwader/static-ffmpeg:9.0.2'
+alias ffmpeg='docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" mwader/static-ffmpeg:9.0.2-1'
+alias ffprobe='docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" --entrypoint=/ffprobe mwader/static-ffmpeg:9.0.2-1'
 ```
 
 ### Libraries
@@ -100,7 +100,7 @@ alias ffprobe='docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" --ent
 - `/ffprobe` ffprobe binary
 - `/doc` Documentation
 - `/versions.json` JSON file with build versions of ffmpeg and libraries.
-- `/etc/ssl/cert.pem` CA certs to make `-tls_verify 1 -ca_file /etc/ssl/cert.pem` work if running image directly
+- `/etc/ssl/cert.pem` CA certs to make `-ca_file /etc/ssl/cert.pem` work if running image directly
 - Fonts, fontconfig config and pre-populated cache:
   - `/etc/fonts`
   - `/usr/share/fonts`
@@ -155,8 +155,8 @@ EOF
 2. Copy the `ffmpeg` (and `ffprobe`) binaries.
 
 ```Dockerfile
-COPY --from=mwader/static-ffmpeg:9.0.2 /ffmpeg /usr/bin/
-COPY --from=mwader/static-ffmpeg:9.0.2 /ffprobe /usr/bin/
+COPY --from=mwader/static-ffmpeg:9.0.2-1 /ffmpeg /usr/bin/
+COPY --from=mwader/static-ffmpeg:9.0.2-1 /ffprobe /usr/bin/
 ```
 
 3. Make sure the `/app/fonts` directory exist in your image.
@@ -185,8 +185,8 @@ EOF
 
 FROM base as ffmpeg
 
-COPY --from=mwader/static-ffmpeg:9.0.2 /ffmpeg /usr/bin/
-COPY --from=mwader/static-ffmpeg:9.0.2 /ffprobe /usr/bin/
+COPY --from=mwader/static-ffmpeg:9.0.2-1 /ffmpeg /usr/bin/
+COPY --from=mwader/static-ffmpeg:9.0.2-1 /ffprobe /usr/bin/
 
 FROM ffmpeg AS app
 
@@ -227,9 +227,10 @@ Opening an input file: color=white,drawtext=text=Test:fontfile=Arial.
 
 ### TLS
 
-Binaries are built with TLS support but, by default, ffmpeg currently do
-not do certificate verification. To enable verification you need to run
-ffmpeg with `-tls_verify 1` and `-ca_file /path/to/cert.pem`.
+Binaries are built with TLS support. Since ffmpeg 9.0 certificate verification
+is enabled by default. Before 9.0 verification was off by
+default and had to be enabled with `-tls_verify 1`. To verify, ffmpeg needs CA
+certificates, use `-ca_file /path/to/cert.pem` to point to them:
 
 - Alpine Linux at `/etc/ssl/cert.pem`
 - Debian/Ubuntu install the `ca-certificates` package at it will be available at `/etc/ssl/certs/ca-certificates.crt`.

@@ -4,13 +4,13 @@
 
 Compile nothing that ffmpeg does not need. *Need* means ffmpeg links it **and** can actually call it: code that ends up in a library but that ffmpeg can never reach goes, and so does anything with its own target that nothing links at all.
 
-Change **build parameters**: configure/meson/cmake flags, make targets and their arguments — *flag* below means any of these. The result must be a functionally identical `ffmpeg`, so a flag that changes how a library behaves for calls ffmpeg does make, or that removes a capability a peer could negotiate, stays even when it would shorten the build.
+Change **build parameters**: configure/meson/cmake flags, make targets and their arguments — *flag* below means any of these. The resulting `ffmpeg` must not be able to do less than before, so a flag that changes how a library behaves for calls ffmpeg does make, or that removes a capability a peer could negotiate, stays even when it would shorten the build. More function is welcome where the code already provides it; see "Unused features".
 
 This describes the method, not a fixed result. Options and their defaults change with every library version, so re-derive every flag from the option surface of the *pinned* version on each run. The names and cases mentioned below are illustrations, not evidence: they age with the versions, and quoting this runbook instead of the file repeats the error it guards against.
 
 - Source: `https://raw.githubusercontent.com/wader/static-ffmpeg/refs/heads/master/Dockerfile`. Fetch it fresh and read the whole file.
 - Write the result to `Dockerfile.opt`, never over `Dockerfile`, so `diff -u Dockerfile Dockerfile.opt` stays the review artifact.
-- Keep unchanged: the Alpine version, every library version and hash unless a switch under "Downloads" changes it with the owner's decision, the hardening settings (`CFLAGS`/`CXXFLAGS`/`LDFLAGS`, ffmpeg's `--toolchain=hardened`), `checkelf`, the sanity tests and the final stages.
+- Keep unchanged: the Alpine version, every library version and hash unless a switch under "Downloads" changes it with the owner's decision, the hardening settings (`CFLAGS`/`CXXFLAGS`/`LDFLAGS`, ffmpeg's `--toolchain=hardened`), the sanity tests and the final stages.
 - Besides build parameters, this step reduces and steadies what the build fetches, as long as the built `ffmpeg` keeps its function: see "Downloads" below.
 - Out of scope, because they are neither build parameters nor downloads: restructuring the build or its stages, patching upstream build files.
 
@@ -94,10 +94,15 @@ Some recipes fetch more than the Dockerfile's own `wget`/`git clone`: meson wrap
 - **Cargo crates** have no fallback and stay as they are.
 - Every new download follows the form of the other downloads in the Dockerfile: its variables, a step of its own and bump lines.
 
+## Unused features
+
+A library can hold a capability that ffmpeg is able to use and that this build leaves off: the dependency it needs is built later in the file, is not built at all, or sits behind an option that is off by default. Switching it on belongs to this step.
+
+Find it in the option surface read in Step 2: the feature options and optional dependencies of the pinned version, and which of them are off in this build. Whether ffmpeg can reach the feature is the trace of Step 4 in the other direction. Switch it on by moving the recipe that provides the dependency ahead of the one that uses it, by setting the flag, or by adding the missing library as a recipe in the form of the others.
+
 ## Pitfalls
 
 - **`--help` is not a default.** Find the assignment in `configure`/`CMakeLists.txt`.
 - **Off-by-default lists.** Some projects keep a second list that overrides the generic default.
 - **A flag belongs where the recipe hands it on.** Some recipes do not call the configuration tool directly: they pass flags to a script through a variable, at times patched in by a `sed` in the same `RUN`. Read the recipe to its end — a flag placed at the nearest-looking call site is dropped without a word.
 - **Dropping unreachable code shortens the build, not the binary.** Without `-ffunction-sections`/`--gc-sections` the linker pulls only referenced object files from each `.a`, so unreferenced code never reached the binary anyway.
-- **Do not turn a flag pass into a feature change.** Options that add codecs or quality features are out of scope even when they look like free wins.

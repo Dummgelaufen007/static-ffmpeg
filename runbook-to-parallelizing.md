@@ -39,7 +39,7 @@ Not a build dependency: symbol collisions handled at link time (e.g. libzmq/libs
 4. **Every stage passes on what later stages read.** Libraries install into `/usr/local` so `.pc` prefixes stay valid after the merge; check non-standard installs (cargo cinstall, manual `cp`, symlinks).
 5. **`builder` stage.** `FROM base AS builder`, then one `COPY --link --from=<leaf>` per leaf build stage for what the `builder` reads, then download and build ffmpeg as in the original; chain members arrive through the last stage of their chain. The COPYs must precede the ffmpeg build so `./configure` finds the libraries. `--link` is safe here because the merges are additive and duplicate files from chains are identical.
 6. **versions.json.** Re-declare every version ARG the `jq` block reads via `env.*`; missing ones silently become `null`.
-7. **Keep unchanged:** `checkelf`, the font `apk add`, the final stages, and the stage name `builder`.
+7. **Keep unchanged:** the font `apk add`, the final stages, and the stage name `builder`.
 8. **Comment the non-obvious:** which chain links are hard and which are kept only for identical output, and why each stage has its parent.
 
 ## Step 3: x265 — parallel bit depths instead of multilib.sh

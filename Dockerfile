@@ -953,10 +953,9 @@ RUN \
 # bump: xeve after ./hashupdate Dockerfile XEVE $LATEST
 # bump: xeve link "CHANGELOG" https://github.com/mpeg5/xeve/releases/tag/v$LATEST
 # TODO: better -DARM? possible to build on non arm and intel?
-# TODO: report upstream about lib/libxeve.a?
-ARG XEVE_VERSION=0.7.0
+ARG XEVE_VERSION=0.7.1
 ARG XEVE_URL="https://github.com/mpeg5/xeve/archive/refs/tags/v$XEVE_VERSION.tar.gz"
-ARG XEVE_SHA256=f60950d063f52adf11ed7196c0bbb0503fa107b0e43af06bdc81fecc24f2a62e
+ARG XEVE_SHA256=5d1249212f431816b4723937c9ec8491b45ee1bb75c0f46692deaf7f59fbf19c
 RUN \
   wget $WGET_OPTS -O xeve.tar.gz "$XEVE_URL" && \
   echo "$XEVE_SHA256  xeve.tar.gz" | sha256sum -c - && \
@@ -970,17 +969,15 @@ RUN \
     -DARM="$(if [ $(uname -m) == aarch64 ]; then echo TRUE; else echo FALSE; fi)" \
     -DCMAKE_BUILD_TYPE=Release \
     .. && \
-  make -j$(nproc) install && \
-  ln -s /usr/local/lib/xeve/libxeve.a /usr/local/lib/libxeve.a
+  make -j$(nproc) install
 
 # bump: xevd /XEVD_VERSION=([\d.]+)/ https://github.com/mpeg5/xevd.git|*
 # bump: xevd after ./hashupdate Dockerfile XEVD $LATEST
 # bump: xevd link "CHANGELOG" https://github.com/mpeg5/xevd/releases/tag/v$LATEST
 # TODO: better -DARM? possible to build on non arm and intel?
-# TODO: report upstream about lib/libxevd.a?
-ARG XEVD_VERSION=0.7.0
+ARG XEVD_VERSION=0.8.0
 ARG XEVD_URL="https://github.com/mpeg5/xevd/archive/refs/tags/v$XEVD_VERSION.tar.gz"
-ARG XEVD_SHA256=febfdb532819bbf36b1b04e74d3ef328ad0f0f2db6224ddb7640fce6bd0014f4
+ARG XEVD_SHA256=258d626fbb6c7ea1677b4fb0ffed3eaca2ec312810d6a76f67359fdc16068472
 RUN \
   wget $WGET_OPTS -O xevd.tar.gz "$XEVD_URL" && \
   echo "$XEVD_SHA256  xevd.tar.gz" | sha256sum -c - && \
@@ -992,8 +989,7 @@ RUN \
     -DARM="$(if [ $(uname -m) == aarch64 ]; then echo TRUE; else echo FALSE; fi)" \
     -DCMAKE_BUILD_TYPE=Release \
     .. && \
-  make -j$(nproc) install && \
-  ln -s /usr/local/lib/xevd/libxevd.a /usr/local/lib/libxevd.a
+  make -j$(nproc) install
 
 # bump: zimg /ZIMG_VERSION=([\d.]+)/ https://github.com/sekrit-twc/zimg.git|*
 # bump: zimg after ./hashupdate Dockerfile ZIMG $LATEST
@@ -1303,10 +1299,25 @@ RUN \
   }' > /versions.json
 
 # make sure binaries has no dependencies, is relro, pie and stack nx
-COPY checkelf /
 RUN \
-  /checkelf /usr/local/bin/ffmpeg && \
-  /checkelf /usr/local/bin/ffprobe
+  for f in /usr/local/bin/ffmpeg /usr/local/bin/ffprobe; do \
+    NOEXTLIBS=$(test "$(ldd "$f" | wc -l)" -eq 1 && echo yes || echo no) && \
+    RELRO=$(readelf -l "$f" | grep -q GNU_RELRO && echo yes || echo no) && \
+    BIND_NOW=$(readelf -d "$f" | grep -q BIND_NOW && echo yes || echo no) && \
+    PIE=$(readelf -h "$f" | grep -q DYN && echo yes || echo no) && \
+    STACKNX=$(readelf -W -l "$f" | grep GNU_STACK | grep -q -v RWE && echo yes || echo no) && \
+    file "$f" && \
+    echo "No external libs: $NOEXTLIBS" && \
+    echo "Relocate read-only: $RELRO" && \
+    echo "Resolve at startup: $BIND_NOW" && \
+    echo "Position independent code: $PIE" && \
+    echo "Stack non-executable: $STACKNX" && \
+    [ "$NOEXTLIBS" = "yes" ] && \
+    [ "$RELRO" = "yes" ] && \
+    [ "$BIND_NOW" = "yes" ] && \
+    [ "$PIE" = "yes" ] && \
+    [ "$STACKNX" = "yes" ] || exit 1; \
+  done
 
 # some basic fonts that don't take up much space
 RUN apk add $APK_OPTS font-terminus font-inconsolata font-dejavu font-awesome
@@ -1330,8 +1341,8 @@ RUN ["/ffmpeg", "-hide_banner", "-buildconf"]
 RUN ["/ffmpeg", "-f", "lavfi", "-i", "testsrc", "-c:v", "libsvtav1", "-t", "100ms", "-f", "null", "-"]
 # dns
 RUN ["/ffprobe", "-i", "https://github.com/favicon.ico"]
-# tls/https certs
-RUN ["/ffprobe", "-tls_verify", "1", "-ca_file", "/etc/ssl/cert.pem", "-i", "https://github.com/favicon.ico"]
+# tls/https certs and check that -tls_verify 1 is default in 9.0
+RUN ["/ffprobe", "-ca_file", "/etc/ssl/cert.pem", "-i", "https://github.com/favicon.ico"]
 # svg
 RUN ["/ffprobe", "-i", "https://github.githubassets.com/favicons/favicon.svg"]
 # vvenc
