@@ -245,10 +245,10 @@ RUN \
 # bump: aom /AOM_VERSION=([\d.]+)/ fetch:https://storage.googleapis.com/aom-releases/|/libaom-([\d.]+)\.tar\.gz/|*
 # bump: aom after ./hashupdate Dockerfile AOM $LATEST
 # bump: aom link "CHANGELOG" https://aomedia.googlesource.com/aom/+/refs/tags/v$LATEST/CHANGELOG
-ARG AOM_VERSION=3.15.1
+ARG AOM_VERSION=3.15.2
 ARG AOM_URL="https://storage.googleapis.com/aom-releases/libaom-$AOM_VERSION.tar.gz"
 ARG AOM_FILE="aom.$AOM_VERSION.tar.gz"
-ARG AOM_SHA256=8ca0c52746174603500f0adb6f2a215d69c9ca2aab2acb3caa06fb791d8d01bf
+ARG AOM_SHA256=67bb54b245f33ed98600e08269e6139986e48114e14042474ddd8885801dfddc
 RUN \
   tar $TAR_OPTS $AOM_FILE && cd libaom-* && \
   # tune=vmaf without vmaf-model-path falls back to the model built into libvmaf
