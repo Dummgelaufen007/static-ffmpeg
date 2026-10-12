@@ -335,10 +335,10 @@ RUN \
 # bump: fdk-aac after ./hashupdate Dockerfile FDK_AAC $LATEST
 # bump: fdk-aac link "ChangeLog" https://github.com/mstorsjo/fdk-aac/blob/master/ChangeLog
 # bump: fdk-aac link "Source diff $CURRENT..$LATEST" https://github.com/mstorsjo/fdk-aac/compare/v$CURRENT..v$LATEST
-ARG FDK_AAC_VERSION=2.0.3
+ARG FDK_AAC_VERSION=3.0.0
 ARG FDK_AAC_URL="https://github.com/mstorsjo/fdk-aac/archive/v$FDK_AAC_VERSION.tar.gz"
 ARG FDK_AAC_FILE="fdk-aac.$FDK_AAC_VERSION.tar.gz"
-ARG FDK_AAC_SHA256=e25671cd96b10bad896aa42ab91a695a9e573395262baed4e4a2ff178d6a3a78
+ARG FDK_AAC_SHA256=8538ea8f0f9915e460c106a13e1866a9e13c7ee48c1b67d0b2cf7b4e8159bd1a
 RUN \
   wget -O $FDK_AAC_FILE $WGET_OPTS "$FDK_AAC_URL" && \
   echo "$FDK_AAC_SHA256  $FDK_AAC_FILE" | sha256sum -c - && \
@@ -421,10 +421,10 @@ RUN \
 # bump: mp3lame /MP3LAME_VERSION=([\d.]+)/ svn:http://svn.code.sf.net/p/lame/svn|/^RELEASE__(.*)$/|/_/./|*
 # bump: mp3lame after ./hashupdate Dockerfile MP3LAME $LATEST
 # bump: mp3lame link "ChangeLog" http://svn.code.sf.net/p/lame/svn/trunk/lame/ChangeLog
-ARG MP3LAME_VERSION=3.100
+ARG MP3LAME_VERSION=4.0
 ARG MP3LAME_URL="https://sourceforge.net/projects/lame/files/lame/$MP3LAME_VERSION/lame-$MP3LAME_VERSION.tar.gz/download"
 ARG MP3LAME_FILE="mp3lame.$MP3LAME_VERSION.tar.gz"
-ARG MP3LAME_SHA256=ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e
+ARG MP3LAME_SHA256=3df5124d5ad3a98312ffd7ba6a9b36230e4f8a3e66d3ce0f425e336c32d216eb
 RUN \
   wget -O $MP3LAME_FILE $WGET_OPTS "$MP3LAME_URL" && \
   echo "$MP3LAME_SHA256  $MP3LAME_FILE" | sha256sum -c - && \
@@ -435,6 +435,7 @@ RUN \
     --enable-nasm \
     --disable-gtktest \
     --disable-cpml \
+    --disable-decoder \
     --disable-frontend && \
   make -j$(nproc) install
 
