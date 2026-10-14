@@ -60,7 +60,7 @@ for df in "${DOCKERFILES[@]}"; do
         docker buildx build \
             --build-arg IMAGE="$tag" \
             --build-arg VARIANT="$df" \
-            --build-arg CACHE_BUST="$(date +%s)" \
+            --build-arg CACHE_BUST="$(date +%y%m%d_%H%M%S)" \
             --target export \
             --output type=local,dest="$LOGDIR" \
             -f export . || echo "    Export FEHLGESCHLAGEN (rc=$?)"
