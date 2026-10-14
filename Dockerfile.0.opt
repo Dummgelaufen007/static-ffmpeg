@@ -30,17 +30,11 @@ RUN apk add --no-cache $APK_OPTS \
   expat-dev expat-static \
   fontconfig-dev fontconfig-static \
   freetype freetype-dev freetype-static \
-  graphite2-static \
-  tiff tiff-dev \
-  libjpeg-turbo libjpeg-turbo-dev \
   libpng-dev libpng-static \
-  giflib giflib-dev \
   fribidi-dev fribidi-static \
   brotli-dev brotli-static \
   soxr-dev soxr-static \
-  tcl \
   numactl-dev \
-  cunit cunit-dev \
   fftw-dev fftw-static \
   libsamplerate-dev libsamplerate-static \
   vo-amrwbenc-dev vo-amrwbenc-static \
@@ -49,7 +43,6 @@ RUN apk add --no-cache $APK_OPTS \
   xz-dev xz-static \
   python3 py3-packaging \
   linux-headers \
-  curl \
   pcre2-dev pcre2-static libffi-dev musl-libintl \
   pixman-dev pixman-static
 
@@ -663,7 +656,7 @@ RUN \
   RUSTFLAGS="-C target-feature=+crt-static" \
   CARGO_PROFILE_RELEASE_LTO=false \
   CARGO_PROFILE_RELEASE_DEBUG=false \
-  cargo cinstall --release \
+  cargo cinstall --release --locked \
     --library-type staticlib \
     --no-default-features \
     --features asm,threading,git_version,capi
@@ -678,14 +671,14 @@ RUN \
   git checkout --recurse-submodules $LIBRTMP_COMMIT && \
   make -C librtmp SYS=posix SHARED=off XCFLAGS="$CFLAGS" OPT= -j$(nproc) install
 
-# bump: rubberband /RUBBERBAND_VERSION=([\d.]+)/ https://github.com/breakfastquay/rubberband.git|^2
+# bump: rubberband /RUBBERBAND_VERSION=([\d.]+)/ https://github.com/breakfastquay/rubberband.git|^4
 # bump: rubberband after ./hashupdate Dockerfile RUBBERBAND $LATEST
 # bump: rubberband link "CHANGELOG" https://github.com/breakfastquay/rubberband/blob/default/CHANGELOG
 # bump: rubberband link "Source diff $CURRENT..$LATEST" https://github.com/breakfastquay/rubberband/compare/$CURRENT..$LATEST
-ARG RUBBERBAND_VERSION=2.0.2
+ARG RUBBERBAND_VERSION=4.0.0
 ARG RUBBERBAND_URL="https://breakfastquay.com/files/releases/rubberband-$RUBBERBAND_VERSION.tar.bz2"
 ARG RUBBERBAND_FILE="rubberband.$RUBBERBAND_VERSION.tar.bz2"
-ARG RUBBERBAND_SHA256=b9eac027e797789ae99611c9eaeaf1c3a44cc804f9c8a0441a0d1d26f3d6bdf9
+ARG RUBBERBAND_SHA256=af050313ee63bc18b35b2e064e5dce05b276aaf6d1aa2b8a82ced1fe2f8028e9
 RUN \
   wget -O $RUBBERBAND_FILE $WGET_OPTS "$RUBBERBAND_URL" && \
   echo "$RUBBERBAND_SHA256  $RUBBERBAND_FILE" | sha256sum -c - && \
@@ -694,8 +687,7 @@ RUN \
     -Ddefault_library=static \
     -Dfft=fftw \
     -Dresampler=libsamplerate && \
-  ninja -j$(nproc) -vC build install && \
-  echo "Requires.private: fftw3 samplerate" >> /usr/local/lib/pkgconfig/rubberband.pc
+  ninja -j$(nproc) -vC build install
 
 # bump: libshine /LIBSHINE_VERSION=([\d.]+)/ https://github.com/toots/shine.git|*
 # bump: libshine after ./hashupdate Dockerfile LIBSHINE $LATEST
@@ -1368,10 +1360,13 @@ RUN \
   FONTCONFIG_VERSION=$(pkg-config --modversion fontconfig) \
   FREETYPE_VERSION=$(pkg-config --modversion freetype2) \
   FRIBIDI_VERSION=$(pkg-config --modversion fribidi) \
+  LIBFFI_VERSION=$(pkg-config --modversion libffi) \
   LIBSAMPLERATE_VERSION=$(pkg-config --modversion samplerate) \
   LIBVO_AMRWBENC_VERSION=$(pkg-config --modversion vo-amrwbenc) \
   LIBXML2_VERSION=$(pkg-config --modversion libxml-2.0) \
   OPENSSL_VERSION=$(pkg-config --modversion openssl) \
+  PCRE2_VERSION=$(pkg-config --modversion libpcre2-8) \
+  PIXMAN_VERSION=$(pkg-config --modversion pixman-1) \
   SNAPPY_VERSION=$(apk info -a snappy $APK_OPTS | head -n1 | awk '{print $1}' | sed -e 's/snappy-//') \
   SOXR_VERSION=$(pkg-config --modversion soxr) \
   jq -n \
@@ -1388,6 +1383,7 @@ RUN \
   libbluray: env.LIBBLURAY_VERSION, \
   libdav1d: env.DAV1D_VERSION, \
   libdavs2: env.DAVS2_VERSION, \
+  libffi: env.LIBFFI_VERSION, \
   libfreetype: env.FREETYPE_VERSION, \
   libfribidi: env.FRIBIDI_VERSION, \
   libgme: env.LIBGME_VERSION, \
@@ -1436,6 +1432,8 @@ RUN \
   libzimg: env.ZIMG_VERSION, \
   libzmq: env.LIBZMQ_VERSION, \
   openssl: env.OPENSSL_VERSION, \
+  pcre2: env.PCRE2_VERSION, \
+  pixman: env.PIXMAN_VERSION, \
   }' > /versions.json
 
 # make sure binaries has no dependencies, is relro, pie and stack nx

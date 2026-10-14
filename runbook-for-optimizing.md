@@ -12,6 +12,7 @@ This describes the method, not a fixed result. Options and their defaults change
 - Write the result to `Dockerfile.opt`, never over `Dockerfile`, so `diff -u Dockerfile Dockerfile.opt` stays the review artifact.
 - Keep unchanged: the Alpine version, every library version and hash unless a switch under "Downloads" changes it with the owner's decision, the hardening settings (`CFLAGS`/`CXXFLAGS`/`LDFLAGS`, ffmpeg's `--toolchain=hardened`), the sanity tests and the final stages.
 - Besides build parameters, this step reduces and steadies what the build fetches, as long as the built `ffmpeg` keeps its function: see "Downloads" below.
+- It also removes what has lost its reader once the flags are set: see "What has lost its reader" below.
 - Out of scope, because they are neither build parameters nor downloads: restructuring the build or its stages, patching upstream build files.
 
 ## Step 1: list the recipes
@@ -47,7 +48,7 @@ Three questions, in this order:
 2. **Can ffmpeg reach it?** For code that ends up in the installed `.a`, trace it in Step 4. Unreachable means ffmpeg's wrapper never calls into it **and** exposes no option that would, not merely "we do not use it". Code that is reachable, negotiable or behaviour-changing stays.
 3. **Does it produce anything at all?** A default that yields no artifact — automake dependency tracking, generated man pages, a second link pass for a shared library nobody installs — answers the first two questions with "nothing" and is a candidate all the same, as long as the `ffmpeg` it produces is unchanged and the option's own help text establishes what the default costs.
 
-An optional dependency the library picks up from the image is no separate case: it follows the same questions by what it feeds, and it goes when it feeds nothing but an unlinked target. If it also propagates into the `.pc`, turning it off drops a link edge from ffmpeg as well.
+An optional dependency the library picks up from the image is no separate case: it follows the same questions by what it feeds, and it goes when it feeds nothing but an unlinked target. If it also propagates into the `.pc`, turning it off drops a link edge from ffmpeg as well. Going means the flag that turns it off; whether what it used still has a reader afterwards is the question of "What has lost its reader".
 
 Quote the line that decides which of the questions applies — the target declaration that puts the option's code into a separate artifact, or the source list that puts it into the installed `.a`. Either way the candidate goes on to Step 4.
 
@@ -80,6 +81,7 @@ A run that finds nothing is a complete run. The report states what was read, not
 - For every flag: the quoted default or target list comes from the pinned version, not from `master` or from memory.
 - For every flag that drops code from an installed `.a`: the symbol list and the exposed options from Step 4 are what carry the claim that ffmpeg cannot reach it.
 - No flag in the diff is a no-op: its tool and dependency are installed before that recipe runs, the option it hangs off is on, and the variable exists in this version.
+- For everything the Dockerfile installs, runs or declares besides the builds themselves: its reader, or the line that turns its last reader off.
 - The `diff -u` against the original, read hunk by hunk.
 
 ## Downloads
@@ -93,6 +95,22 @@ Some recipes fetch more than the Dockerfile's own `wget`/`git clone`: meson wrap
 - **Helper scripts** that fetch more than the build uses (e.g. `deps.sh`) are replaced by the sources the build actually needs, each as a download step of its own, synced to the pinned version of the library that requires it (an `after` line on that library's bump).
 - **Cargo crates** have no fallback and stay as they are.
 - Every new download follows the form of the other downloads in the Dockerfile: its variables, a step of its own and bump lines.
+
+## What has lost its reader
+
+Goal: nothing in the image and nothing in the Dockerfile that no build reads.
+
+The steps above start from a recipe and ask what it builds. This one asks the reverse of everything the Dockerfile provides or does: who reads it? It comes last, because every flag of Steps 3 and 4 and every switch under "Downloads" can take the last reader away.
+
+Walk the Dockerfile itself, not a list from this runbook: what it installs, what it runs around a build, what it declares, and whatever else it holds. Packages and commands left in a recipe are where this has turned up so far; that says where to begin, not where to stop.
+
+For each thing, name its reader: whatever turns it into something that is installed, linked or run in the state the result builds in. Read that from the place that does the reading — the consumer's build files, a package's dependency list, the call of a tool — not from the name of the thing or from what it is usually for. Being found is not being read: a check whose answer nothing is built from reads nothing.
+
+What has no reader goes, with the line that shows its last reader is off. Whatever it brought along gets the same question, one by one.
+
+Keeping follows the rule of Step 3: a thing stays because its reader is named. That this section does not mention its kind is no reason to leave it alone.
+
+A build log shows what was installed and which step found it, not whether anything was built from the answer; that comes from the recipe and the build files it runs.
 
 ## Unused features
 
