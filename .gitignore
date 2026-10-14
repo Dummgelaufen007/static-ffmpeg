@@ -1,8 +1,1 @@
-buildlogs
-downloads
-qnap
-upstream-pr
-checkelf
-*.tar.xz
-.DS_Store
-.git-upstream
+.gitignore
