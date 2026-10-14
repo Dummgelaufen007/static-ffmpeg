@@ -104,7 +104,7 @@ ARG GLIB_FILE="glib.$GLIB_VERSION.tar.xz"
 ARG GLIB_SHA256=93c941aa17d5eb1d53fe838365f29a8b4e539c222a256d974ec8f30fc413e396
 RUN \
   wget -O $GLIB_FILE $WGET_OPTS "$GLIB_URL" && \
-  echo "$GLIB_SHA256  $GLIB_FILE" | sha256sum --status -c - && \
+  echo "$GLIB_SHA256  $GLIB_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $GLIB_FILE && cd glib-* && \
   meson setup build \
     -Dbuildtype=release \
@@ -124,7 +124,7 @@ ARG LIBHARFBUZZ_FILE="libharfbuzz.$LIBHARFBUZZ_VERSION.tar.xz"
 ARG LIBHARFBUZZ_SHA256=d07a007327277708a2a73ae437887cdbaf282937f6d03ca5467723e9099af586
 RUN \
   wget -O $LIBHARFBUZZ_FILE $WGET_OPTS "$LIBHARFBUZZ_URL" && \
-  echo "$LIBHARFBUZZ_SHA256  $LIBHARFBUZZ_FILE" | sha256sum --status -c - && \
+  echo "$LIBHARFBUZZ_SHA256  $LIBHARFBUZZ_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $LIBHARFBUZZ_FILE && cd harfbuzz-* && \
   meson setup build \
     -Dbuildtype=release \
@@ -140,7 +140,7 @@ ARG CAIRO_FILE="cairo.$CAIRO_VERSION.tar.xz"
 ARG CAIRO_SHA256=1c767308174337a74694da0f3ec069c271452163a1ef4540964c50c301f157d4
 RUN \
   wget -O $CAIRO_FILE $WGET_OPTS "$CAIRO_URL" && \
-  echo "$CAIRO_SHA256  $CAIRO_FILE" | sha256sum --status -c - && \
+  echo "$CAIRO_SHA256  $CAIRO_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $CAIRO_FILE && cd cairo-* && \
   meson setup build \
     -Dbuildtype=release \
@@ -164,7 +164,7 @@ ARG PANGO_SHA256=342385b6ca3b7c73455d7c80a13b7dbe4489e00bc3bd4c5bd6ed4dce421e374
 # TODO: -Ddefault_library=both currently to not fail building tests
 RUN \
   wget -O $PANGO_FILE $WGET_OPTS "$PANGO_URL" && \
-  echo "$PANGO_SHA256  $PANGO_FILE" | sha256sum --status -c - && \
+  echo "$PANGO_SHA256  $PANGO_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $PANGO_FILE && cd pango-* && \
   meson setup build \
     -Dbuildtype=release \
@@ -182,7 +182,7 @@ ARG LIBRSVG_FILE="librsvg.$LIBRSVG_VERSION.tar.xz"
 ARG LIBRSVG_SHA256=852b18e1a00b8605528825a27dc7748bff2a5dd254028f59dc22a34ea57e81b6
 RUN \
   wget -O $LIBRSVG_FILE $WGET_OPTS "$LIBRSVG_URL" && \
-  echo "$LIBRSVG_SHA256  $LIBRSVG_FILE" | sha256sum --status -c - && \
+  echo "$LIBRSVG_SHA256  $LIBRSVG_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $LIBRSVG_FILE && cd librsvg-* && \
   # workaround for https://gitlab.gnome.org/GNOME/librsvg/-/issues/1158
   sed -i "/^if host_system in \['windows'/s/, 'linux'//" meson.build && \
@@ -410,7 +410,7 @@ ARG LIBMODPLUG_FILE="libmodplug.$LIBMODPLUG_VERSION.tar.gz"
 ARG LIBMODPLUG_SHA256=457ca5a6c179656d66c01505c0d95fafaead4329b9dbaa0f997d00a3508ad9de
 RUN \
   wget -O $LIBMODPLUG_FILE $WGET_OPTS "$LIBMODPLUG_URL" && \
-  echo "$LIBMODPLUG_SHA256  $LIBMODPLUG_FILE" | sha256sum -c && \
+  echo "$LIBMODPLUG_SHA256  $LIBMODPLUG_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $LIBMODPLUG_FILE && cd libmodplug-* && \
   ./configure \
     --disable-shared \
@@ -1106,7 +1106,7 @@ ARG VVENC_FILE="vvenc.$VVENC_VERSION.tar.gz"
 ARG VVENC_SHA256=dd43d061d59dbc0d9b9ae5b99cb40672877dd811646228938f065798939ee174
 RUN \
   wget -O $VVENC_FILE $WGET_OPTS "$VVENC_URL" && \
-  echo "$VVENC_SHA256  $VVENC_FILE" | sha256sum --status -c - && \
+  echo "$VVENC_SHA256  $VVENC_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $VVENC_FILE && cd vvenc-* && \
   sed -i 's/-Werror;//' source/Lib/vvenc/CMakeLists.txt && \
   cmake \
