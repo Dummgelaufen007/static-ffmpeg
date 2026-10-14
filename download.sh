@@ -28,10 +28,25 @@ fetch() {
 }
 
 clone() {
-  local d="$dl_dir/$1"
-  [[ -d "$d" ]] && return 0
-  rm -rf "$d.tmp"
-  sh ./git-mini-clone "$2" "$3" "$d.tmp"
+  local d="$dl_dir/$1" s
+  if [[ -d "$d" ]]; then rm -rf "$d.tmp"; mv "$d" "$d.tmp"; fi
+  # explicit git dir: git -C falls back to the project repo when .git is broken
+  local g=(git --git-dir="$d.tmp/.git" --work-tree="$d.tmp")
+  if ! "${g[@]}" cat-file -e "$3^{commit}" 2>/dev/null; then
+    rm -rf "$d.tmp"
+    git init -q "$d.tmp"
+    "${g[@]}" fetch --depth=1 "$2" "$3"
+  fi
+  if ! { [[ $("${g[@]}" rev-parse HEAD 2>/dev/null) == "$3" ]] && "${g[@]}" read-tree HEAD 2>/dev/null \
+      && s=$("${g[@]}" status --porcelain --untracked-files=all 2>/dev/null) && [[ -z $s ]]; }; then
+    if ! "${g[@]}" -c advice.detachedHead=false checkout -qf "$3" 2>/dev/null; then
+      rm -rf "$d.tmp"
+      git init -q "$d.tmp"
+      "${g[@]}" fetch --depth=1 "$2" "$3"
+      "${g[@]}" -c advice.detachedHead=false checkout -q FETCH_HEAD
+    fi
+    "${g[@]}" clean -qfdx
+  fi
   mv "$d.tmp" "$d"
 }
 

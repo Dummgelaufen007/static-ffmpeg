@@ -13,7 +13,6 @@ RUN apk add --no-cache $APK_OPTS bash wget git
 COPY --from=downloads / /downloads/
 ARG DOCKERFILE=Dockerfile
 RUN --mount=src=download.sh,dst=/download.sh \
-    --mount=src=git-mini-clone,dst=/git-mini-clone \
     --mount=src=$DOCKERFILE,dst=/Dockerfile \
   bash /download.sh /Dockerfile /downloads
 
