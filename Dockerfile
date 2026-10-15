@@ -516,9 +516,9 @@ RUN \
 # bump: librabbitmq /LIBRABBITMQ_VERSION=([\d.]+)/ https://github.com/alanxz/rabbitmq-c.git|*
 # bump: librabbitmq after ./hashupdate Dockerfile LIBRABBITMQ $LATEST
 # bump: librabbitmq link "ChangeLog" https://github.com/alanxz/rabbitmq-c/blob/master/ChangeLog.md
-ARG LIBRABBITMQ_VERSION=0.18.0
+ARG LIBRABBITMQ_VERSION=0.18.1
 ARG LIBRABBITMQ_URL="https://github.com/alanxz/rabbitmq-c/archive/refs/tags/v$LIBRABBITMQ_VERSION.tar.gz"
-ARG LIBRABBITMQ_SHA256=d57782c950ec04c7da3692cad6f02059dad6df90e588e2f6a1def632fa59f7d7
+ARG LIBRABBITMQ_SHA256=0779bd4f00175ff2f722f9dc43b542bea3bc606ed079e7099fa8a18627c2ddc9
 RUN \
   wget $WGET_OPTS -O rabbitmq-c.tar.gz "$LIBRABBITMQ_URL" && \
   echo "$LIBRABBITMQ_SHA256  rabbitmq-c.tar.gz" | sha256sum -c - && \
@@ -568,13 +568,13 @@ RUN \
   git checkout --recurse-submodules $LIBRTMP_COMMIT && \
   make SYS=posix SHARED=off XCFLAGS="$CFLAGS" OPT= -j$(nproc) install
 
-# bump: rubberband /RUBBERBAND_VERSION=([\d.]+)/ https://github.com/breakfastquay/rubberband.git|^2
+# bump: rubberband /RUBBERBAND_VERSION=([\d.]+)/ https://github.com/breakfastquay/rubberband.git|*
 # bump: rubberband after ./hashupdate Dockerfile RUBBERBAND $LATEST
 # bump: rubberband link "CHANGELOG" https://github.com/breakfastquay/rubberband/blob/default/CHANGELOG
 # bump: rubberband link "Source diff $CURRENT..$LATEST" https://github.com/breakfastquay/rubberband/compare/$CURRENT..$LATEST
-ARG RUBBERBAND_VERSION=2.0.2
+ARG RUBBERBAND_VERSION=4.0.0
 ARG RUBBERBAND_URL="https://breakfastquay.com/files/releases/rubberband-$RUBBERBAND_VERSION.tar.bz2"
-ARG RUBBERBAND_SHA256=b9eac027e797789ae99611c9eaeaf1c3a44cc804f9c8a0441a0d1d26f3d6bdf9
+ARG RUBBERBAND_SHA256=af050313ee63bc18b35b2e064e5dce05b276aaf6d1aa2b8a82ced1fe2f8028e9
 RUN \
   wget $WGET_OPTS -O rubberband.tar.bz2 "$RUBBERBAND_URL" && \
   echo "$RUBBERBAND_SHA256  rubberband.tar.bz2" | sha256sum -c - && \
@@ -583,8 +583,7 @@ RUN \
     -Ddefault_library=static \
     -Dfft=fftw \
     -Dresampler=libsamplerate && \
-  ninja -j$(nproc) -vC build install && \
-  echo "Requires.private: fftw3 samplerate" >> /usr/local/lib/pkgconfig/rubberband.pc
+  ninja -j$(nproc) -vC build install
 
 # bump: libshine /LIBSHINE_VERSION=([\d.]+)/ https://github.com/toots/shine.git|*
 # bump: libshine after ./hashupdate Dockerfile LIBSHINE $LATEST
@@ -884,18 +883,18 @@ RUN \
     --disable-cli && \
   make -j$(nproc) install
 
-# bump: x265 /X265_VERSION=([\d.]+)/ https://bitbucket.org/multicoreware/x265_git.git|*
+# bump: x265 /X265_VERSION=([\d.]+)/ https://github.com/Multicorewareinc/x265.git|*
 # bump: x265 after ./hashupdate Dockerfile X265 $LATEST
-# bump: x265 link "Source diff $CURRENT..$LATEST" https://bitbucket.org/multicoreware/x265_git/branches/compare/$LATEST..$CURRENT#diff
-ARG X265_VERSION=4.2
-ARG X265_SHA256=40b1ea0453e0309f0eba934e0ddf533f8f6295966679e8894e8f1c1c8d5e1210
-ARG X265_URL="https://bitbucket.org/multicoreware/x265_git/downloads/x265_$X265_VERSION.tar.gz"
+# bump: x265 link "Source diff $CURRENT..$LATEST" https://github.com/Multicorewareinc/x265/compare/$CURRENT..$LATEST
+ARG X265_VERSION=4.3
+ARG X265_SHA256=83c53e4c8bbb8f1e33ed59e10a7d621d1d7801ca853910c3eb41f038b8ffb121
+ARG X265_URL="https://github.com/Multicorewareinc/x265/releases/download/$X265_VERSION/x265_$X265_VERSION.tar.gz"
 # CMAKEFLAGS issue
 # https://bitbucket.org/multicoreware/x265_git/issues/620/support-passing-cmake-flags-to-multilibsh
 RUN \
-  wget $WGET_OPTS -O x265_git.tar.bz2 "$X265_URL" && \
-  echo "$X265_SHA256  x265_git.tar.bz2" | sha256sum -c - && \
-  tar $TAR_OPTS x265_git.tar.bz2 && cd x265_*/build/linux && \
+  wget $WGET_OPTS -O x265.tar.gz "$X265_URL" && \
+  echo "$X265_SHA256  x265.tar.gz" | sha256sum -c - && \
+  tar $TAR_OPTS x265.tar.gz && cd x265_*/build/linux && \
   sed -i '/^cmake / s/$/ -G "Unix Makefiles" ${CMAKEFLAGS}/' ./multilib.sh && \
   sed -i 's/ -DENABLE_SHARED=OFF//g' ./multilib.sh && \
   MAKEFLAGS="-j$(nproc)" \
