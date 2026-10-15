@@ -4,7 +4,14 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-DOCKERFILES=("${@:?usage: $0 <dockerfile>...}")
+USAGE="usage: $0 <dockerfile>... [arm64]"
+DOCKERFILES=("${@:?$USAGE}")
+ARCH=
+if [[ ! -f ${DOCKERFILES[-1]} ]]; then
+    ARCH=${DOCKERFILES[-1]}
+    unset 'DOCKERFILES[-1]'
+fi
+: "${DOCKERFILES[0]:?$USAGE}"
 LOGDIR="buildtime-$(date +%y%m%d_%H%M%S)"
 BUILDER=buildtime
 PARALLELISM=3
@@ -44,6 +51,7 @@ for df in "${DOCKERFILES[@]}"; do
         --load \
         --no-cache \
         --progress=rawjson \
+        ${ARCH:+--platform linux/"$ARCH"} \
         --build-arg ENABLE_FDKAAC=1 \
         ${HTTP_PROXY:+--build-arg http_proxy="$HTTP_PROXY"} \
         --build-arg DOCKERFILE="$df" \
