@@ -81,7 +81,7 @@ ARG CXXFLAGS="-O3 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPI
 ARG LDFLAGS="-Wl,-z,relro,-z,now"
 
 # retry dns and some http codes that might be transient errors
-ARG WGET_OPTS="--tries=10 --timeout=10 --retry-connrefused --retry-on-host-error --retry-on-http-error=429,500,502,503,504"
+ARG WGET_OPTS="--tries=10 --connect-timeout=10 --retry-connrefused --retry-on-host-error --retry-on-http-error=429,500,502,503,504"
 
 # --no-same-owner as we don't care about uid/gid even if we run as root. fixes invalid gid/uid issue.
 ARG TAR_OPTS="--no-same-owner --extract --file"
@@ -146,9 +146,9 @@ RUN \
 # bump: cairo after ./hashupdate Dockerfile CAIRO $LATEST
 # bump: cairo link "NEWS" https://gitlab.freedesktop.org/cairo/cairo/-/blob/master/NEWS?ref_type=heads
 ARG CAIRO_VERSION=1.18.6
-ARG CAIRO_URL="https://cairographics.org/releases/cairo-$CAIRO_VERSION.tar.xz"
-ARG CAIRO_FILE="cairo.$CAIRO_VERSION.tar.xz"
-ARG CAIRO_SHA256=1c767308174337a74694da0f3ec069c271452163a1ef4540964c50c301f157d4
+ARG CAIRO_URL="https://gitlab.freedesktop.org/cairo/cairo/-/archive/$CAIRO_VERSION/cairo-$CAIRO_VERSION.tar.gz"
+ARG CAIRO_FILE="cairo.$CAIRO_VERSION.tar.gz"
+ARG CAIRO_SHA256=a95ae4f522ef24312af7339563f65e0a03b1ad3d58a46df73d2ef690fe15ae7f
 RUN \
   tar $TAR_OPTS $CAIRO_FILE && cd cairo-* && \
   meson setup build \
@@ -329,13 +329,16 @@ ARG FDK_AAC_VERSION=3.0.0
 ARG FDK_AAC_URL="https://github.com/mstorsjo/fdk-aac/archive/v$FDK_AAC_VERSION.tar.gz"
 ARG FDK_AAC_FILE="fdk-aac.$FDK_AAC_VERSION.tar.gz"
 ARG FDK_AAC_SHA256=8538ea8f0f9915e460c106a13e1866a9e13c7ee48c1b67d0b2cf7b4e8159bd1a
+ARG ENABLE_FDKAAC=
 RUN \
+  if [[ -n "$ENABLE_FDKAAC" ]]; then \
   tar $TAR_OPTS $FDK_AAC_FILE && cd fdk-aac-* && \
   ./autogen.sh && \
   ./configure \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) install
+  make -j$(nproc) install; \
+  fi
 
 # bump: libgme /LIBGME_COMMIT=([[:xdigit:]]+)/ gitrefs:https://github.com/libgme/game-music-emu.git|re:#^refs/heads/master$#|@commit
 # bump: libgme after ./hashupdate Dockerfile LIBGME $LATEST
@@ -544,7 +547,7 @@ RUN \
   RUSTFLAGS="-C target-feature=+crt-static" \
   CARGO_PROFILE_RELEASE_LTO=false \
   CARGO_PROFILE_RELEASE_DEBUG=false \
-  cargo cinstall --release \
+  cargo cinstall --release --locked \
     --library-type staticlib \
     --no-default-features \
     --features asm,threading,git_version,capi
@@ -712,7 +715,7 @@ RUN \
 # bump: theora link "Release notes" https://github.com/xiph/theora/releases/tag/v$LATEST
 # bump: theora link "Source diff $CURRENT..$LATEST" https://github.com/xiph/theora/compare/v$CURRENT..v$LATEST
 ARG THEORA_VERSION=1.2.0
-ARG THEORA_URL="http://downloads.xiph.org/releases/theora/libtheora-$THEORA_VERSION.tar.gz"
+ARG THEORA_URL="https://downloads.xiph.org/releases/theora/libtheora-$THEORA_VERSION.tar.gz"
 ARG THEORA_FILE="theora.$THEORA_VERSION.tar.gz"
 ARG THEORA_SHA256=279327339903b544c28a92aeada7d0dcfd0397b59c2f368cc698ac56f515906e
 RUN \
@@ -1045,7 +1048,6 @@ ARG FFMPEG_VERSION=9.0.2
 ARG FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2"
 ARG FFMPEG_FILE="ffmpeg.$FFMPEG_VERSION.tar.bz2"
 ARG FFMPEG_SHA256=ee80a25a5621df84498cef46917be87eab3b4f01951e85c2c7cbe5c94914ee70
-ARG ENABLE_FDKAAC=
 # sed changes --toolchain=hardened -pie to -static-pie
 #
 # ldflags stack-size=2097152 is to increase default stack size from 128KB (musl default) to something
@@ -1199,7 +1201,8 @@ RUN \
   libzimg: env.ZIMG_VERSION, \
   libzmq: env.LIBZMQ_VERSION, \
   openssl: env.OPENSSL_VERSION, \
-  }' > /versions.json
+  } \
+  | if env.ENABLE_FDKAAC == "" then del(."libfdk-aac") end' > /versions.json
 
 # make sure binaries has no dependencies, is relro, pie and stack nx
 RUN \
