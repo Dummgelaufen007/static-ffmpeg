@@ -10,8 +10,9 @@ COPY --from=ffmpeg / /data
 
 ARG CACHE_BUST
 ARG VARIANT=
+ARG TARGETARCH
 
-RUN NAME="ffmpeg-${VARIANT:+$VARIANT-}${CACHE_BUST}" && \
+RUN NAME="ffmpeg-${TARGETARCH}-${VARIANT:+$VARIANT-}${CACHE_BUST}" && \
     mv /data "/${NAME}" && \
     tar -I "xz -T0" \
         -cf "/${NAME}.tar.xz" \

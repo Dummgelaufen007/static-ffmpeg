@@ -4,8 +4,7 @@ set -xeo pipefail
 
 cd "$(dirname "$0")"
 
-DOCKERFILE=${1:?usage: $0 <dockerfile> [arm64]}
-ARCH=${2:-}
+DOCKERFILE=${1:?usage: $0 <dockerfile>}
 PARALLELISM=3
 
 docker buildx inspect ffbuilder &>/dev/null || docker buildx create \
@@ -24,7 +23,6 @@ fi
 docker buildx build \
     --builder ffbuilder \
     --load \
-    ${ARCH:+--platform linux/"$ARCH"} \
     --build-arg ENABLE_FDKAAC=1 \
     ${HTTP_PROXY:+--build-arg http_proxy="$HTTP_PROXY"} \
     -t static-ffmpeg-fdk \
