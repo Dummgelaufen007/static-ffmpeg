@@ -605,6 +605,7 @@ RUN \
     -Dbuildtype=release \
     -Ddefault_library=static \
     -Dtests=disabled \
+    -Dprefer_static=true \
     -Dtee=disabled \
     -Dquartz=disabled \
     -Dxcb=disabled \
@@ -626,6 +627,7 @@ RUN \
   meson setup build \
     -Dbuildtype=release \
     -Ddefault_library=static \
+    -Dprefer_static=true \
     -Dintrospection=disabled \
     -Dbuild-testsuite=false \
     -Dbuild-examples=false \
