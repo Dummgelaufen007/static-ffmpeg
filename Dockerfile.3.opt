@@ -37,7 +37,6 @@ RUN apk add --no-cache $APK_OPTS \
   cmake meson ninja \
   git \
   yasm nasm \
-  texinfo \
   jq \
   zlib-dev zlib-static \
   bzip2-dev bzip2-static \
@@ -1195,9 +1194,7 @@ RUN \
   --disable-debug \
   --disable-shared \
   --disable-ffplay \
-  --disable-manpages \
-  --disable-podpages \
-  --disable-txtpages \
+  --disable-doc \
   --enable-static \
   --enable-gpl \
   --enable-version3 \
@@ -1259,7 +1256,7 @@ RUN \
   --enable-libzmq \
   --enable-openssl \
   || (cat ffbuild/config.log ; false) \
-  && make -j$(nproc) install-progs install-doc
+  && make -j$(nproc) install-progs
 
 RUN \
   EXPAT_VERSION=$(pkg-config --modversion expat) \
@@ -1372,7 +1369,6 @@ FROM scratch AS final1
 COPY --from=builder /usr/local/bin/ffmpeg /
 COPY --from=builder /usr/local/bin/ffprobe /
 COPY --from=builder /versions.json /
-COPY --from=builder /usr/local/share/doc/ffmpeg/* /doc/
 COPY --from=builder /etc/ssl/cert.pem /etc/ssl/cert.pem
 COPY --from=builder /etc/fonts/ /etc/fonts/
 COPY --from=builder /usr/share/fonts/ /usr/share/fonts/
