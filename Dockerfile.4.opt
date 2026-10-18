@@ -1592,6 +1592,9 @@ ARG FFMPEG_SHA256=ee80a25a5621df84498cef46917be87eab3b4f01951e85c2c7cbe5c94914ee
 # ldflags stack-size=2097152 is to increase default stack size from 128KB (musl default) to something
 # more similar to glibc (2MB). This fixing segfault with libaom-av1 and libsvtav1 as they seems to pass
 # large things on the stack.
+#
+# -mincoming-stack-boundary=4: lto-wrapper hands the -mpreferred-stack-boundary of x264, davs2 and xavs2
+# to the whole program, which then assumes 32 byte aligned incoming stacks that musl threads do not give.
 RUN \
   tar $TAR_OPTS $FFMPEG_FILE && cd ffmpeg-* && \
   FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-nonfree " ;else echo ""; fi) && \
@@ -1601,7 +1604,7 @@ RUN \
   --enable-${LTO_FLAGS#-f} \
   --pkg-config-flags="--static" \
   --extra-cflags="-fopenmp" \
-  --extra-ldflags="-fopenmp -Wl,-z,stack-size=2097152" \
+  --extra-ldflags="-fopenmp -Wl,-z,stack-size=2097152 $(if [ $(uname -m) == x86_64 ]; then echo -mincoming-stack-boundary=4; fi)" \
   --toolchain=hardened \
   --disable-debug \
   --disable-shared \
@@ -1762,6 +1765,7 @@ RUN \
     PIE=$(readelf -h "$f" | grep -q DYN && echo yes || echo no) && \
     STACKNX=$(readelf -W -l "$f" | grep GNU_STACK | grep -q -v RWE && echo yes || echo no) && \
     file "$f" && \
+    readelf -lW "$f" | grep GNU_STACK && \
     echo "No external libs: $NOEXTLIBS" && \
     echo "Relocate read-only: $RELRO" && \
     echo "Resolve at startup: $BIND_NOW" && \
