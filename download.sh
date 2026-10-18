@@ -59,8 +59,8 @@ done
 while read -r prefix; do
   file_var=${prefix}_FILE url_var=${prefix}_URL
   if [[ -z ${!file_var:-} ]]; then
-    commit_var=${prefix}_COMMIT version_var=${prefix}_VERSION
-    git_clone "${!url_var}" "${!commit_var:-${!version_var}}"
+    commit_var=${prefix}_COMMIT
+    git_clone "${!url_var}" "${!commit_var:-}"
   fi
 done < <(sed -n 's/^ARG \([A-Za-z0-9_]*\)_URL=.*/\1/p' "$dockerfile")
 
