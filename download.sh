@@ -18,13 +18,12 @@ eval "$(sed -n 's/^ARG \([A-Za-z_][A-Za-z0-9_]*=\)/\1/p' "$dockerfile")"
 mkdir -p "$dl_dir"
 
 fetch_file() {
-  local url=$1 file="$dl_dir/$2" sha=$3
-  if [[ -f "$file" ]] && echo "$sha  $file" | sha256sum -c - >/dev/null 2>&1; then
-    return 0
+  local url=$1 file=$dl_dir/$2 sha=$3
+  if ! echo "$sha  $file" | sha256sum -c - >/dev/null 2>&1; then
+    wget -O "$file.tmp" -q --show-progress $WGET_OPTS "$url"
+    echo "$sha  $file.tmp" | sha256sum -c -
+    mv "$file.tmp" "$file"
   fi
-  wget -O "$file.tmp" -q --show-progress $WGET_OPTS "$url"
-  echo "$sha  $file.tmp" | sha256sum -c -
-  mv "$file.tmp" "$file"
 }
 
 git_clone() {
@@ -46,13 +45,10 @@ git_clone() {
 
 while read -r prefix; do
   file_var=${prefix}_FILE url_var=${prefix}_URL sha_var=${prefix}_SHA256
-  fetch_file "${!url_var}" "${!file_var}" "${!sha_var}"
-done < <(sed -n 's/^ARG \([A-Za-z0-9_]*\)_FILE=.*/\1/p' "$dockerfile")
-
-while read -r prefix; do
-  file_var=${prefix}_FILE url_var=${prefix}_URL
-  if [[ -z ${!file_var:-} ]]; then
-    dir_var=${prefix}_DIR commit_var=${prefix}_COMMIT
+  dir_var=${prefix}_DIR commit_var=${prefix}_COMMIT
+  if [[ -n ${!file_var:-} ]]; then
+    fetch_file "${!url_var}" "${!file_var}" "${!sha_var}"
+  else
     git_clone "${!url_var}" "${!dir_var}" "${!commit_var:-}"
   fi
 done < <(sed -n 's/^ARG \([A-Za-z0-9_]*\)_URL=.*/\1/p' "$dockerfile")
