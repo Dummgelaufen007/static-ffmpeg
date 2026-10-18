@@ -15,17 +15,50 @@ ARG DOCKERFILE=Dockerfile
 ARG ENABLE_FDKAAC=
 ARG ENABLE_LIBDVDCSS=
 ARG OPTIONAL_DOWNLOADS="FDK_AAC=ENABLE_FDKAAC LIBDVDCSS=ENABLE_LIBDVDCSS"
-RUN --mount=src=download.sh,dst=/download.sh \
-    --mount=src=$DOCKERFILE,dst=/Dockerfile <<'DOWNLOADER'
-#!/bin/bash
-set -euo pipefail
+RUN --mount=src=$DOCKERFILE,dst=/Dockerfile bash -euo pipefail <<'DOWNLOADER'
 skip=()
 for pair in $OPTIONAL_DOWNLOADS; do
   switch=${pair#*=}
   [[ -n ${!switch} ]] || skip+=("${pair%%=*}")
 done
 sed -E "/^ARG ($(IFS='|'; echo "${skip[*]}"))_(URL|FILE)=/d" /Dockerfile > /Dockerfile.downloads
-bash /download.sh /Dockerfile.downloads /downloads
+fetch_file() {
+  local url=$1 file=$2 sha=$3
+  if ! echo "$sha  $file" | sha256sum -c - >/dev/null 2>&1; then
+    wget -O "$file" $WGET_OPTS "$url"
+    echo "$sha  $file" | sha256sum -c -
+  fi
+}
+git_clone() {
+  local url=$1 commit=$2 name dir changes
+  name=$(basename "$url" .git)
+  if ! [[ $commit =~ ^[0-9a-f]{40}$ ]]; then
+    echo "not a commit for $url: $commit" >&2
+    exit 1
+  fi
+  dir=$name-$commit
+  # explicit git dir: git -C falls back to a parent repo when .git is broken
+  local repo_git=(git --git-dir="$dir/.git" --work-tree="$dir")
+  if ! { [[ $("${repo_git[@]}" rev-parse HEAD 2>/dev/null) == "$commit" ]] && "${repo_git[@]}" read-tree HEAD 2>/dev/null \
+      && changes=$("${repo_git[@]}" status --porcelain --untracked-files=all 2>/dev/null) && [[ -z $changes ]]; }; then
+    rm -rf "$dir"
+    git clone --filter=tree:0 --no-checkout "$url" "$dir"
+    git -C "$dir" -c advice.detachedHead=false checkout --recurse-submodules "$commit"
+  fi
+  rm -rf "$name"
+  ln -s "$dir" "$name"
+}
+eval "$(sed -n 's/^ARG \([A-Za-z_][A-Za-z0-9_]*=\)/\1/p' /Dockerfile.downloads)"
+cd /downloads
+for prefix in $(sed -n 's/^ARG \([A-Za-z0-9_]*\)_URL=.*/\1/p' /Dockerfile.downloads); do
+  file_var=${prefix}_FILE url_var=${prefix}_URL sha_var=${prefix}_SHA256
+  commit_var=${prefix}_COMMIT version_var=${prefix}_VERSION
+  if [[ -n ${!file_var:-} ]]; then
+    fetch_file "${!url_var}" "${!file_var}" "${!sha_var}"
+  else
+    git_clone "${!url_var}" "${!commit_var:-${!version_var}}"
+  fi
+done
 DOWNLOADER
 
 # the autoreconf needs gettext-dev, which conflicts with the musl-libintl glib uses in the builder
