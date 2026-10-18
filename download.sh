@@ -28,13 +28,11 @@ fetch_file() {
 }
 
 git_clone() {
-  local url=$1 commit=$2 name dir changes
-  name=$(basename "$url" .git)
+  local url=$1 dir=$dl_dir/$2 commit=$3 changes
   if ! [[ $commit =~ ^[0-9a-f]{40}$ ]]; then
     echo "not a commit for $url: $commit" >&2
     exit 1
   fi
-  dir=$dl_dir/$name-$commit
   # explicit git dir: git -C falls back to the project repo when .git is broken
   local repo_git=(git --git-dir="$dir/.git" --work-tree="$dir")
   if ! { [[ $("${repo_git[@]}" rev-parse HEAD 2>/dev/null) == "$commit" ]] && "${repo_git[@]}" read-tree HEAD 2>/dev/null \
@@ -44,7 +42,6 @@ git_clone() {
     git -C "$dir.tmp" -c advice.detachedHead=false checkout --recurse-submodules "$commit"
     mv "$dir.tmp" "$dir"
   fi
-  ln -sfn "$name-$commit" "$dl_dir/$name"
 }
 
 while read -r prefix; do
@@ -52,22 +49,10 @@ while read -r prefix; do
   fetch_file "${!url_var}" "${!file_var}" "${!sha_var}"
 done < <(sed -n 's/^ARG \([A-Za-z0-9_]*\)_FILE=.*/\1/p' "$dockerfile")
 
-for link in "$dl_dir"/*; do
-  if [[ -L $link ]]; then rm "$link"; fi
-done
-
 while read -r prefix; do
   file_var=${prefix}_FILE url_var=${prefix}_URL
   if [[ -z ${!file_var:-} ]]; then
-    commit_var=${prefix}_COMMIT
-    git_clone "${!url_var}" "${!commit_var:-}"
+    dir_var=${prefix}_DIR commit_var=${prefix}_COMMIT
+    git_clone "${!url_var}" "${!dir_var}" "${!commit_var:-}"
   fi
 done < <(sed -n 's/^ARG \([A-Za-z0-9_]*\)_URL=.*/\1/p' "$dockerfile")
-
-keep=$(for link in "$dl_dir"/*; do if [[ -L $link ]]; then readlink "$link"; fi; done)
-for dir in "$dl_dir"/*/; do
-  dir=${dir%/}
-  if ! [[ -L $dir ]] && ! grep -qxF "$(basename "$dir")" <<< "$keep"; then
-    rm -rf "$dir"
-  fi
-done

@@ -30,7 +30,7 @@ fetch_file() {
   fi
 }
 git_clone() {
-  local url=$1 commit=$2 dir=$3 changes
+  local url=$1 dir=$2 commit=$3 changes
   if ! [[ $commit =~ ^[0-9a-f]{40}$ ]]; then
     echo "not a commit for $url: $commit" >&2
     exit 1
@@ -48,11 +48,11 @@ eval "$(sed -n 's/^ARG \([A-Za-z_][A-Za-z0-9_]*=\)/\1/p' /Dockerfile.downloads)"
 cd /downloads
 for prefix in $(sed -n 's/^ARG \([A-Za-z0-9_]*\)_URL=.*/\1/p' /Dockerfile.downloads); do
   file_var=${prefix}_FILE url_var=${prefix}_URL sha_var=${prefix}_SHA256
-  commit_var=${prefix}_COMMIT dir_var=${prefix}_DIR
+  dir_var=${prefix}_DIR commit_var=${prefix}_COMMIT
   if [[ -n ${!file_var:-} ]]; then
     fetch_file "${!url_var}" "${!file_var}" "${!sha_var}"
   else
-    git_clone "${!url_var}" "${!commit_var:-}" "${!dir_var}"
+    git_clone "${!url_var}" "${!dir_var}" "${!commit_var:-}"
   fi
 done
 DOWNLOADER
