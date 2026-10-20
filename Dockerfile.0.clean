@@ -246,9 +246,8 @@ ARG LIBARIBB24_SHA256=f61560738926e57f9173510389634d8c06cabedfa857db4b28fb770470
 RUN \
   wget -O $LIBARIBB24_FILE $WGET_OPTS "$LIBARIBB24_URL" && \
   echo "$LIBARIBB24_SHA256  $LIBARIBB24_FILE" | sha256sum -c - && \
-  mkdir libaribb24 && \
-  tar $TAR_OPTS $LIBARIBB24_FILE -C libaribb24 --strip-components=1 && \
-  cd libaribb24 && \
+  tar $TAR_OPTS $LIBARIBB24_FILE && \
+  cd aribb24-* && \
   autoreconf -fiv && \
   ./configure \
     --enable-static \

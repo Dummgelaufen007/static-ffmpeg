@@ -311,9 +311,8 @@ ARG LIBARIBB24_PR17_URL="https://github.com/nkoriyama/aribb24/commit/58a34b8fabf
 ARG LIBARIBB24_PR17_FILE="libaribb24.pr17.patch"
 ARG LIBARIBB24_PR17_SHA256=1a4fc77f677a6ff87d024e3a218186160b23620c84dbd791ec5c425de0a8e6c2
 RUN \
-  mkdir libaribb24 && \
-  tar $TAR_OPTS $LIBARIBB24_FILE -C libaribb24 --strip-components=1 && \
-  cd libaribb24 && \
+  tar $TAR_OPTS $LIBARIBB24_FILE && \
+  cd aribb24-* && \
   for p in $LIBARIBB24_PR12_FILE $LIBARIBB24_PR13_FILE $LIBARIBB24_PR17_FILE; do patch -p1 < ../$p || exit 1; done && \
   autoreconf -fiv && \
   ./configure \

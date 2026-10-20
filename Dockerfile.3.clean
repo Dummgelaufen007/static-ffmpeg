@@ -248,9 +248,8 @@ ARG LIBARIBB24_URL="https://github.com/nkoriyama/aribb24/archive/v$LIBARIBB24_VE
 ARG LIBARIBB24_FILE="libaribb24.$LIBARIBB24_VERSION.tar.gz"
 ARG LIBARIBB24_SHA256=f61560738926e57f9173510389634d8c06cabedfa857db4b28fb7704707ff128
 RUN \
-  mkdir libaribb24 && \
-  tar $TAR_OPTS $LIBARIBB24_FILE -C libaribb24 --strip-components=1 && \
-  cd libaribb24 && \
+  tar $TAR_OPTS $LIBARIBB24_FILE && \
+  cd aribb24-* && \
   autoreconf -fiv && \
   ./configure \
     --enable-static \

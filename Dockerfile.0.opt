@@ -298,9 +298,8 @@ RUN \
   echo "$LIBARIBB24_PR13_SHA256  $LIBARIBB24_PR13_FILE" | sha256sum -c - && \
   wget -O $LIBARIBB24_PR17_FILE $WGET_OPTS "$LIBARIBB24_PR17_URL" && \
   echo "$LIBARIBB24_PR17_SHA256  $LIBARIBB24_PR17_FILE" | sha256sum -c - && \
-  mkdir libaribb24 && \
-  tar $TAR_OPTS $LIBARIBB24_FILE -C libaribb24 --strip-components=1 && \
-  cd libaribb24 && \
+  tar $TAR_OPTS $LIBARIBB24_FILE && \
+  cd aribb24-* && \
   for p in $LIBARIBB24_PR12_FILE $LIBARIBB24_PR13_FILE $LIBARIBB24_PR17_FILE; do patch -p1 < ../$p || exit 1; done && \
   autoreconf -fiv && \
   ./configure \
