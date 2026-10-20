@@ -51,12 +51,22 @@ git_clone() {
   fi
 }
 
+keep=()
 while read -r prefix; do
   file_var=${prefix}_FILE url_var=${prefix}_URL sha_var=${prefix}_SHA256
   dir_var=${prefix}_DIR commit_var=${prefix}_COMMIT
   if [[ -n ${!file_var:-} ]]; then
     fetch_file "${!url_var}" "${!file_var}" "${!sha_var}"
+    keep+=("${!file_var}")
   else
     git_clone "${!url_var}" "${!dir_var}" "${!commit_var:-}"
+    keep+=("${!dir_var}")
   fi
 done < <(sed -n 's/^ARG \([A-Za-z0-9_]*\)_URL=.*/\1/p' <<< "$args")
+
+for entry in "$dl_dir"/* "$dl_dir"/.[!.]*; do
+  name=${entry##*/}
+  if [[ -e $entry && $name != *.tmp && " ${keep[*]} " != *" $name "* ]]; then
+    rm -rf "$entry"
+  fi
+done
