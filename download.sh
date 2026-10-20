@@ -13,7 +13,15 @@ if ! [[ -f $dockerfile ]]; then
   exit 1
 fi
 
-eval "$(sed -n 's/^ARG \([A-Za-z_][A-Za-z0-9_]*=\)/\1/p' "$dockerfile")"
+# switches arrive only as build-args, so the host fetches every source for the cache
+skip=()
+for pair in ${OPTIONAL_DOWNLOADS:-}; do
+  switch=${pair#*=}
+  [[ -n ${!switch:-} ]] || skip+=("${pair%%=*}")
+done
+args=$(sed -E "/^ARG ($(IFS='|'; echo "${skip[*]}"))_(URL|FILE)=/d" "$dockerfile")
+
+eval "$(sed -n 's/^ARG \([A-Za-z_][A-Za-z0-9_]*=\)/\1/p' <<< "$args")"
 
 mkdir -p "$dl_dir"
 
@@ -51,4 +59,4 @@ while read -r prefix; do
   else
     git_clone "${!url_var}" "${!dir_var}" "${!commit_var:-}"
   fi
-done < <(sed -n 's/^ARG \([A-Za-z0-9_]*\)_URL=.*/\1/p' "$dockerfile")
+done < <(sed -n 's/^ARG \([A-Za-z0-9_]*\)_URL=.*/\1/p' <<< "$args")
