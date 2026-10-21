@@ -499,22 +499,18 @@ RUN apk add --no-cache $APK_OPTS \
   libpng-dev libpng-static \
   fribidi-dev fribidi-static \
   brotli-dev brotli-static \
-  soxr-dev soxr-static \
   numactl-dev \
   fftw-dev fftw-static \
   libsamplerate-dev libsamplerate-static \
-  vo-amrwbenc-dev vo-amrwbenc-static \
-  snappy snappy-dev snappy-static \
-  xxd \
   xz-dev xz-static \
   python3 py3-packaging \
   linux-headers \
-  pcre2-dev pcre2-static libffi-dev musl-libintl \
+  pcre2-dev pcre2-static libffi-dev \
   pixman-dev pixman-static
 
 # linux-headers need by rtmpdump
 # python3 py3-packaging needed by glib
-# pcre2-dev pcre2-static libffi-dev musl-libintl replace the pcre2, libffi and proxy-libintl downloads of glib
+# pcre2-dev pcre2-static libffi-dev replace the pcre2 and libffi downloads of glib
 # pixman-dev pixman-static replace the pixman download of cairo
 
 ARG CFLAGS
@@ -527,6 +523,8 @@ ARG APK_OPTS
 RUN apk add --no-cache $APK_OPTS rust cargo cargo-c
 
 FROM base AS vmaf
+ARG APK_OPTS
+RUN apk add --no-cache $APK_OPTS xxd
 ARG VMAF_URL
 ARG VMAF_SHA256
 ADD --checksum=sha256:$VMAF_SHA256 --unpack=true $VMAF_URL /
@@ -546,6 +544,9 @@ RUN \
 RUN sed -i 's/-lvmaf /-lvmaf -lstdc++ /' /usr/local/lib/pkgconfig/libvmaf.pc
 
 FROM base AS glib
+ARG APK_OPTS
+# musl-libintl replaces the proxy-libintl download of glib
+RUN apk add --no-cache $APK_OPTS musl-libintl
 ARG GLIB_URL
 ARG GLIB_SHA256
 # own build as alpine glib links with libmount etc
@@ -1472,6 +1473,11 @@ RUN \
   cmake --build build/release-static --target install
 
 FROM base AS builder
+ARG APK_OPTS
+RUN apk add --no-cache $APK_OPTS \
+  soxr-dev soxr-static \
+  vo-amrwbenc-dev vo-amrwbenc-static \
+  snappy snappy-dev snappy-static
 COPY --link --from=librsvg /usr/local/ /usr/local/
 COPY --link --from=aom /usr/local/ /usr/local/
 COPY --link --from=libaribb24 /usr/local/ /usr/local/
@@ -1600,7 +1606,6 @@ RUN \
   || (cat ffbuild/config.log ; false) \
   && make -j$(nproc) install-progs
 
-ARG APK_OPTS
 ARG VMAF_VERSION
 ARG LIBHARFBUZZ_VERSION
 ARG DAV1D_VERSION
