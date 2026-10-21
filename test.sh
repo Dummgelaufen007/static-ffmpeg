@@ -51,7 +51,7 @@ for df in "${DOCKERFILES[@]}"; do
         --build-arg DOCKERFILE="$df" \
         ${cache:+--build-context downloads="$cache"} \
         -t "$tag" \
-        -f "$df" . 2>&1 | tee "$log" 2>&1 || rc=$?
+        -f "$df" . 2>&1 | tee "$log" | jq -rn --unbuffered 'foreach (inputs | .vertexes[]? | select(.started) | .name) as $name ({}; .new = (.[$name] | not) | .[$name] = true; select(.new) | $name)' || rc=$?
     elapsed=$(($(date +%s) - start))
 
     secs+=("$elapsed")
