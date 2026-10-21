@@ -240,3 +240,11 @@ Source: [Steam Hardware Survey](https://store.steampowered.com/hwsurvey/) (unver
 | measured | image of 2026-10-08 | `-hwaccels` lists only `qsv`; `-init_hw_device qsv=hw` ends with that message and "Function not implemented", before any hardware is touched |
 | measured | comparison build | "Enabled hwaccels" is empty in both builds. Without libvpl the 5 build loses 9 QSV decoders, 6 QSV encoders and 7 QSV filters, and `libmfx` and `libvpl` under "External libraries providing hardware acceleration"; 7 compiler warnings of `hwcontext_qsv.c` go with them |
 | musl | see "Symbols removed from the binary" above | in a static link `dlopen` is a stub, so libva could not load a driver and libvpl could not load its runtime even when linked |
+
+## sourceforge links under ADD
+
+| Point | Finding | Source |
+|---|---|---|
+| Failure | `ADD` of `downloads.sourceforge.net/modplug-xmms/libmodplug-0.8.9.0.tar.gz` and of `sourceforge.net/projects/opencore-amr/files/opencore-amr/opencore-amr-0.1.6.tar.gz` gets sourceforge's HTML page "Download … (…)" instead of the archive, with different content on every request; with `--checksum` the build stops with a digest mismatch. `wget` gets the archive from the same URLs | measured: 20 of 20 and 10 of 10 HTML; build logs of bellair and gaming |
+| Fix | the `…/download` form of the link, which lame already uses, returns the archive to `ADD`: `sourceforge.net/projects/modplug-xmms/files/libmodplug/<v>/libmodplug-<v>.tar.gz/download`, `sourceforge.net/projects/opencore-amr/files/opencore-amr/opencore-amr-<v>.tar.gz/download` | measured: 10 of 10 each with the expected checksum; lame 20 of 20 |
+| Mirrors | every sourceforge link redirects to a mirror that changes from request to request; all other archive URLs go to one fixed host | measured: two requests per URL |
