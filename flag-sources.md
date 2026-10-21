@@ -248,3 +248,10 @@ Source: [Steam Hardware Survey](https://store.steampowered.com/hwsurvey/) (unver
 | Failure | `ADD` of `downloads.sourceforge.net/modplug-xmms/libmodplug-0.8.9.0.tar.gz` and of `sourceforge.net/projects/opencore-amr/files/opencore-amr/opencore-amr-0.1.6.tar.gz` gets sourceforge's HTML page "Download … (…)" instead of the archive, with different content on every request; with `--checksum` the build stops with a digest mismatch. `wget` gets the archive from the same URLs | measured: 20 of 20 and 10 of 10 HTML; build logs of bellair and gaming |
 | Fix | the `…/download` form of the link, which lame already uses, returns the archive to `ADD`: `sourceforge.net/projects/modplug-xmms/files/libmodplug/<v>/libmodplug-<v>.tar.gz/download`, `sourceforge.net/projects/opencore-amr/files/opencore-amr/opencore-amr-<v>.tar.gz/download` | measured: 10 of 10 each with the expected checksum; lame 20 of 20 |
 | Mirrors | every sourceforge link redirects to a mirror that changes from request to request; all other archive URLs go to one fixed host | measured: two requests per URL |
+
+## Git sources
+
+| Library | Finding | Source |
+|---|---|---|
+| uavs3d | upstream pins commit `0e20d2c`, which is tag `1.2`; the fork fetches the GitHub tag archive of `1.2` instead of a git clone | [wader/static-ffmpeg 31c49aa Dockerfile#L771-L772](https://github.com/wader/static-ffmpeg/blob/31c49aa1938b4736bfd55f13bdada70cafc47017/Dockerfile#L771-L772), `git ls-remote https://github.com/uavs3/uavs3d.git refs/tags/1.2` |
+| x264 | `version.sh` counts the commits of `HEAD` and of `origin/master..HEAD`, so the source needs its whole history and `origin/master`; a shallow fetch breaks the version | [x264 b35605a version.sh#L10-L12](https://code.videolan.org/videolan/x264/-/blob/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/version.sh#L10-L12) |
