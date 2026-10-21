@@ -1,8 +1,8 @@
-# Runbook: Stabilizing the downloads of the static-ffmpeg Dockerfile
+# Runbook: Stabilizing the downloads of a Dockerfile
 
 ## Scope
 
-Make the build's downloads reliable and safe: fetching that survives transient errors, sources that answer consistently, transports that are encrypted. What is built stays exactly the same — same content of every source, same `ffmpeg`.
+Make the build's downloads reliable and safe: fetching that survives transient errors, sources that answer consistently, transports that are encrypted. What is built stays exactly the same — same content of every source, same binaries.
 
 - Input: a Dockerfile. Output: a stabilized variant next to it; the `diff -u` against the input is the review artifact.
 - Done elsewhere: tidying names and variables; replacing git sources by release archives, any version change and downloads a recipe triggers by itself during the build; caching.

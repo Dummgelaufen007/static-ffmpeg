@@ -1,8 +1,8 @@
-# Runbook: Cleaning the static-ffmpeg Dockerfile
+# Runbook: Cleaning a Dockerfile
 
 ## Scope
 
-Tidy up the original: whatever the recipes do in the same way is written in the same way. For the downloads that means how they are named, where their URLs live and how they are bumped; for everything else, that an outlier follows its peers. The sources themselves stay exactly as they are — same hosts, protocols, archives, commits and versions — and so does the built `ffmpeg`.
+Tidy up the original: whatever the recipes do in the same way is written in the same way. For the downloads that means how they are named, where their URLs live and how they are bumped; for everything else, that an outlier follows its peers. The sources themselves stay exactly as they are — same hosts, protocols, archives, commits and versions — and so do the built binaries.
 
 - Source and output: as the user names them. Read the whole source; never write over it, so its `diff -u` against the result stays the review artifact.
 - Change only what a renaming, a move or an alignment requires (for a download: its `ARG`s, checksum, extraction, `cd`, taking over the moved source) and bump lines.
@@ -41,9 +41,9 @@ Every line of the same kind is written the same way, following the form its peer
 ## Step 5: bump
 
 - Every version or commit variable has its own bump line, following an existing entry of the same kind.
-- `hashupdate` builds the URL by replacing `$<P>_VERSION` in `<P>_URL`; a URL built from another variable is not updated.
+- Check how the bump tooling builds a URL (today `hashupdate` replaces `$<P>_VERSION` in `<P>_URL`); a URL it cannot rebuild is not updated.
 - Remove bump and `after` lines of variables that no longer exist.
-- Bump lines take effect only in the file listed in `Bumpfile`, and the `after` lines call `hashupdate` on a fixed file; in a cleaned variant they stay inactive until it replaces the original.
+- Bump lines take effect only in the files the bump configuration lists (today `Bumpfile`), and follow-up commands can name a fixed file; in a variant that is not listed they stay inactive until it is.
 
 ## Step 6: verification without a build
 

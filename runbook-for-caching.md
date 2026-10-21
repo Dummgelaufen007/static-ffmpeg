@@ -1,14 +1,14 @@
-# Runbook: Download cache for the static-ffmpeg Dockerfile
+# Runbook: Download cache for a Dockerfile
 
 ## Scope
 
-Every source the Dockerfile fetches itself is kept in a local cache directory and reused by the build. Nothing is compiled differently: the cache variant builds the same `ffmpeg` as the file it is derived from.
+Every source the Dockerfile fetches itself is kept in a local cache directory and reused by the build. Nothing is compiled differently: the cache variant builds the same binaries as the file it is derived from.
 
 - Input: a Dockerfile whose downloads have been cleaned (`runbook-for-cleaning.md`).
 - Output: a cache variant next to it; its difference against the input is the review artifact.
 - Out of scope: downloads a recipe triggers by itself during the build; they are handled by the optimizing runbook.
 
-This describes the method, not a fixed result. Re-derive every decision from the Dockerfile and the tools in use when the runbook is applied.
+This describes the method, not a fixed result. Re-derive every decision from the Dockerfile and the tools in use when the runbook is applied. Names and cases below are illustrations of where a rule has applied so far, not its extent.
 
 ## Prerequisite
 
@@ -64,4 +64,4 @@ The tool that fills the cache has to:
 ## Pitfalls
 
 - **A directory handed over as a named context must exist.** A missing one stops the build before its first step, whether or not a stage refers to it.
-- **Symlinks survive `COPY` and `COPY --from`** as symlinks, so a relative link resolves in the builder.
+- **Symlinks survive `COPY` and `COPY --from`** as symlinks, so a relative link resolves in the stage that copies it.

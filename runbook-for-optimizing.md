@@ -1,16 +1,16 @@
-# Runbook: Optimizing build flags in the static-ffmpeg Dockerfile
+# Runbook: Optimizing build flags in a Dockerfile
 
 ## Scope
 
-Compile nothing that ffmpeg does not need. *Need* means ffmpeg links it **and** can actually call it: code that ends up in a library but that ffmpeg can never reach goes, and so does anything with its own target that nothing links at all.
+Compile nothing that the final program (what the image ships) does not need. *Need* means the program links it **and** can actually call it: code that ends up in a library but that the program can never reach goes, and so does anything with its own target that nothing links at all.
 
-Change **build parameters**: configure/meson/cmake flags, make targets and their arguments — *flag* below means any of these. The resulting `ffmpeg` must not be able to do less than before, so a flag that changes how a library behaves for calls ffmpeg does make, or that removes a capability a peer could negotiate, stays even when it would shorten the build. More function is welcome where the code already provides it; see "Unused features".
+Change **build parameters**: configure/meson/cmake flags, make targets and their arguments — *flag* below means any of these. The resulting program must not be able to do less than before, so a flag that changes how a library behaves for calls the program does make, or that removes a capability a peer could negotiate, stays even when it would shorten the build. More function is welcome where the code already provides it; see "Unused features".
 
 This describes the method, not a fixed result. Options and their defaults change with every library version, so re-derive every flag from the option surface of the *pinned* version on each run. The names and cases mentioned below are illustrations, not evidence: they age with the versions, and quoting this runbook instead of the file repeats the error it guards against.
 
 - Source and output: as the user names them. Read the whole source; never write over it, so its `diff -u` against the result stays the review artifact.
-- Keep unchanged: the Alpine version, every library version and hash unless a switch under "Downloads" changes it with the owner's decision, the hardening settings (`CFLAGS`/`CXXFLAGS`/`LDFLAGS`, ffmpeg's `--toolchain=hardened`) and the sanity tests.
-- Besides build parameters, this step reduces and steadies what the build fetches, as long as the built `ffmpeg` keeps its function: see "Downloads" below.
+- Keep unchanged: the base image version, every library version and hash unless a switch under "Downloads" changes it with the owner's decision, the hardening settings (`CFLAGS`/`CXXFLAGS`/`LDFLAGS` and the final build's own hardening options) and the sanity tests.
+- Besides build parameters, this step reduces and steadies what the build fetches, as long as the built program keeps its function: see "Downloads" below.
 - It also removes what has lost its reader once the flags are set: see "What has lost its reader" below.
 - Out of scope, because they are neither build parameters nor downloads: restructuring the build or its stages, patching upstream build files.
 
@@ -37,17 +37,17 @@ The same files carry what Step 3 needs: which target an option's code belongs to
 
 Set the flag when the default does work this build does not need; quote the line that establishes it — the option's default, or the target list that makes the build produce more than the library. The size of the saving is not a criterion.
 
-## Step 3: decide what ffmpeg needs
+## Step 3: decide what the program needs
 
 Name a candidate only after quoting the line that establishes it: a candidate that exists before its quote came from memory.
 
 Three questions, in this order:
 
 1. **Does anything link it?** A target nothing links — CLI tools, apps, examples, tests, docs, man pages, bindings, companion libraries nobody pulls in — goes, and that target is the whole evidence. Check it, do not infer it from the kind of artifact: a companion library can be required, and only the link line of whatever consumes it says which. Debug information belongs here too: it rides in the `.a` but is no code, and the final binary is stripped.
-2. **Can ffmpeg reach it?** For code that ends up in the installed `.a`, trace it in Step 4. Unreachable means ffmpeg's wrapper never calls into it **and** exposes no option that would, not merely "we do not use it". Code that is reachable, negotiable or behaviour-changing stays.
-3. **Does it produce anything at all?** A default that yields no artifact — automake dependency tracking, generated man pages, a second link pass for a shared library nobody installs — answers the first two questions with "nothing" and is a candidate all the same, as long as the `ffmpeg` it produces is unchanged and the option's own help text establishes what the default costs.
+2. **Can the program reach it?** For code that ends up in the installed `.a`, trace it in Step 4. Unreachable means the program's code that wraps the library never calls into it **and** exposes no option that would, not merely "we do not use it". Code that is reachable, negotiable or behaviour-changing stays.
+3. **Does it produce anything at all?** A default that yields no artifact — automake dependency tracking, generated man pages, a second link pass for a shared library nobody installs — answers the first two questions with "nothing" and is a candidate all the same, as long as the program it produces is unchanged and the option's own help text establishes what the default costs.
 
-An optional dependency the library picks up from the image is no separate case: it follows the same questions by what it feeds, and it goes when it feeds nothing but an unlinked target. If it also propagates into the `.pc`, turning it off drops a link edge from ffmpeg as well. Going means the flag that turns it off; whether what it used still has a reader afterwards is the question of "What has lost its reader".
+An optional dependency the library picks up from the image is no separate case: it follows the same questions by what it feeds, and it goes when it feeds nothing but an unlinked target. If it also propagates into the `.pc`, turning it off drops a link edge from the program as well. Going means the flag that turns it off; whether what it used still has a reader afterwards is the question of "What has lost its reader".
 
 Quote the line that decides which of the questions applies — the target declaration that puts the option's code into a separate artifact, or the source list that puts it into the installed `.a`. Either way the candidate goes on to Step 4.
 
@@ -55,14 +55,14 @@ Rejecting a candidate takes a sentence from this runbook. If there is none, the 
 
 ## Step 4: trace before flipping
 
-Step 3 sends the `.a` case here with one open question — can ffmpeg reach the code? — and every candidate with a second: does turning it off change anything at all? A flag is determinism rather than a saving when its tool or dependency is not there at that point of the build, when the option it hangs off is itself off, or when the variable does not exist in this version.
+Step 3 sends the `.a` case here with one open question — can the program reach the code? — and every candidate with a second: does turning it off change anything at all? A flag is determinism rather than a saving when its tool or dependency is not there at that point of the build, when the option it hangs off is itself off, or when the variable does not exist in this version.
 
-- **Who consumes the library inside the image?** ffmpeg (find its `require`/`check_lib` line in ffmpeg's `configure` and the symbols its wrapper in `libavcodec`/`libavformat` uses) plus every self-built library that links it (grep their `meson.build`/`CMakeLists.txt`/`configure.ac`).
+- **Who consumes the library inside the image?** The final program (find the line in its build configuration that requires the library, and the symbols its wrapping code uses) plus every self-built library that links it (grep their `meson.build`/`CMakeLists.txt`/`configure.ac`).
 - **Would the option's tool even be present?** Check the image's package list.
 - **Build order matters.** A library built *later* in the file cannot be a dependency of an earlier one, so a "disable the binaries" flag can be a no-op for that reason alone.
 - **Rust consumers decide C features.** A crate's `Cargo.toml` features can require C surfaces that the meson dependency list does not mention.
 
-Those four are traps, not the standard. What settles unreachability is the wrapper's full symbol list, the options ffmpeg exposes on top of it, and the upstream sentence saying what the flag withdraws.
+Those four are traps, not the standard. What settles unreachability is the wrapper's full symbol list, the options the program exposes on top of it, and the upstream sentence saying what the flag withdraws.
 
 ## Step 5: apply mechanically
 
@@ -78,7 +78,7 @@ A run that finds nothing is a complete run. The report states what was read, not
 - For every recipe in the Step 1 list: the file that was read, its tag, and what it yielded — including "no candidate". A recipe without a cited file is not done.
 - For every recipe: the flags already in it, checked against that same option surface. A flag whose variable does not exist in this version protects nothing.
 - For every flag: the quoted default or target list comes from the pinned version, not from `master` or from memory.
-- For every flag that drops code from an installed `.a`: the symbol list and the exposed options from Step 4 are what carry the claim that ffmpeg cannot reach it.
+- For every flag that drops code from an installed `.a`: the symbol list and the exposed options from Step 4 are what carry the claim that the program cannot reach it.
 - No flag in the diff is a no-op: its tool and dependency are installed before that recipe runs, the option it hangs off is on, and the variable exists in this version.
 - For everything the Dockerfile installs, runs or declares besides the builds themselves: its reader, or the line that turns its last reader off.
 - The `diff -u` against the original, read hunk by hunk.
@@ -90,9 +90,9 @@ Goal: as few downloads and clones as possible, each from a static source with a 
 Some recipes fetch more than the Dockerfile's own `wget`/`git clone`: meson wraps (`Downloading … source from`, `Cloning into`), cargo crates, helper scripts. The recipe does not show them; find them in the sources of the pinned versions (wrap files, fetch calls in build files and scripts) and confirm them by running the configure step of the pinned version in the state the recipe runs in: the Dockerfile's base image with its package list and everything built before that recipe.
 
 - **Git sources** move to the release archive of the pinned version where one exists; compare the trees. If the content differs, the switch is a version change: list the differences and let the owner decide.
-- **Meson wrap fallbacks** go away by providing the dependency from Alpine. Add the package to the `apk add` list when it ships the static library (`.a`; check the file, not the package name) and pulls in nothing heavy; if its `-dev` drags in a large tree, fetch the packages with `apk fetch` and extract only `.a`, `.pc` and headers in a step of its own. Verify with `meson setup` and the recipe's own options in that same state: the dependency is found from the system (`Run-time dependency <name> found: YES <version>`), its version satisfies the requirement, and nothing is downloaded. The version then comes from Alpine instead of the wrap; the report names both. A comment names the downloads the packages replace.
+- **Meson wrap fallbacks** go away by providing the dependency from the base image's packages. Add the package to the package install list when it ships the static library (`.a`; check the file, not the package name) and pulls in nothing heavy; if its `-dev` drags in a large tree, fetch the packages with the package manager's download command and extract only `.a`, `.pc` and headers in a step of its own. Verify with `meson setup` and the recipe's own options in that same state: the dependency is found from the system (`Run-time dependency <name> found: YES <version>`), its version satisfies the requirement, and nothing is downloaded. The version then comes from the base image instead of the wrap; the report names both. A comment names the downloads the packages replace.
 - **Helper scripts** that fetch more than the build uses (e.g. `deps.sh`) are replaced by the sources the build actually needs, each as a download step of its own, synced to the pinned version of the library that requires it (an `after` line on that library's bump).
-- **Cargo crates** have no fallback and stay as they are.
+- **Fetches without a system fallback** (e.g. cargo crates today) stay as they are; check for a fallback in the pinned version before deciding.
 - Every new download follows the form of the other downloads in the Dockerfile: its variables, a step of its own and bump lines.
 
 ## What has lost its reader
@@ -113,9 +113,9 @@ A build log shows what was installed and which step found it, not whether anythi
 
 ## Unused features
 
-A library can hold a capability that ffmpeg is able to use and that this build leaves off: the dependency it needs is built later in the file, is not built at all, or sits behind an option that is off by default. Switching it on belongs to this step.
+A library can hold a capability that the program is able to use and that this build leaves off: the dependency it needs is built later in the file, is not built at all, or sits behind an option that is off by default. Switching it on belongs to this step.
 
-Find it in the option surface read in Step 2: the feature options and optional dependencies of the pinned version, and which of them are off in this build. Whether ffmpeg can reach the feature is the trace of Step 4 in the other direction. Switch it on by moving the recipe that provides the dependency ahead of the one that uses it, by setting the flag, or by adding the missing library as a recipe in the form of the others.
+Find it in the option surface read in Step 2: the feature options and optional dependencies of the pinned version, and which of them are off in this build. Whether the program can reach the feature is the trace of Step 4 in the other direction. Switch it on by moving the recipe that provides the dependency ahead of the one that uses it, by setting the flag, or by adding the missing library as a recipe in the form of the others.
 
 ## Pitfalls
 
