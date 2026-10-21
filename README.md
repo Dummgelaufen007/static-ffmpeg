@@ -6,8 +6,7 @@
 >
 > - The fork's work lives in `Dockerfile` and its `Dockerfile.*` variants, listed in [naming.md](naming.md).
 > - The fork publishes no image. `mwader/static-ffmpeg` below is upstream's image.
-> - Build a variant with `./build.sh Dockerfile.<n>`. For a variant with a
->   downloader stage, fill the source cache first with
+> - For a variant with a downloader stage, fill the source cache first with
 >   `./download.sh Dockerfile.<n>`.
 >
 > The rest of this README is upstream's.
