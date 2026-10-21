@@ -1,5 +1,19 @@
 ## static-ffmpeg
 
+> [!NOTE]
+> This is a fork of [wader/static-ffmpeg](https://github.com/wader/static-ffmpeg),
+> developed independently. Changes that fit upstream are sent there as pull requests.
+>
+> - The fork's work lives in the `Dockerfile.*` variants, listed in [naming.md](naming.md).
+> - The fork publishes no image. `mwader/static-ffmpeg` below is upstream's image.
+> - Build a variant with `./build.sh Dockerfile.<n>.<variant>`. For a variant with a
+>   downloader stage, fill the source cache first with
+>   `./download.sh Dockerfile.<n>.<variant>`.
+>
+> The rest of this README is upstream's.
+>
+> *Research and wording by Claude (Anthropic), directed and reviewed by me.*
+
 Docker image with
 [ffmpeg](https://ffmpeg.org/ffmpeg.html) and
 [ffprobe](https://ffmpeg.org/ffprobe.html)
