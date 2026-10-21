@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 # wget reads only the lower-case name
 [[ -z ${HTTP_PROXY:-} ]] || export http_proxy="$HTTP_PROXY"
 
-dockerfile="${1:-Dockerfile.0.clean}"
+dockerfile="${1:-Dockerfile}"
 dl_dir="${2:-dl-cache}"
 
 if ! [[ -f $dockerfile ]]; then

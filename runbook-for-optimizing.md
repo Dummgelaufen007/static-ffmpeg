@@ -9,7 +9,7 @@ Change **build parameters**: configure/meson/cmake flags, make targets and their
 This describes the method, not a fixed result. Options and their defaults change with every library version, so re-derive every flag from the option surface of the *pinned* version on each run. The names and cases mentioned below are illustrations, not evidence: they age with the versions, and quoting this runbook instead of the file repeats the error it guards against.
 
 - Source: `https://raw.githubusercontent.com/wader/static-ffmpeg/refs/heads/master/Dockerfile`. Fetch it fresh and read the whole file.
-- Write the result to `Dockerfile.opt`, never over `Dockerfile`, so `diff -u Dockerfile Dockerfile.opt` stays the review artifact.
+- Write the result next to the fetched source, never over it, so `diff -u` of the source and the result stays the review artifact.
 - Keep unchanged: the Alpine version, every library version and hash unless a switch under "Downloads" changes it with the owner's decision, the hardening settings (`CFLAGS`/`CXXFLAGS`/`LDFLAGS`, ffmpeg's `--toolchain=hardened`) and the sanity tests.
 - Besides build parameters, this step reduces and steadies what the build fetches, as long as the built `ffmpeg` keeps its function: see "Downloads" below.
 - It also removes what has lost its reader once the flags are set: see "What has lost its reader" below.

@@ -1,6 +1,6 @@
 # Flag changes in Dockerfile.opt and their sources
 
-Every flag that `Dockerfile.opt` adds or changes compared to `Dockerfile`, with the upstream default and the web source that defines it at the pinned version.
+Every flag that `Dockerfile.opt` adds or changes compared to `Dockerfile`, with the upstream default and the web source that defines it at the pinned version. Here `Dockerfile` is wader's file at `upstream/master` and `Dockerfile.opt` is the fork's `Dockerfile`.
 
 | Library | Dockerfile | Dockerfile.opt | Upstream default | Web source (pinned version) |
 |---|---|---|---|---|
