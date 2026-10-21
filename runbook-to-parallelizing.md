@@ -6,7 +6,7 @@ Restructure wader/static-ffmpeg's `Dockerfile` so BuildKit builds the libraries 
 
 This describes the method, not a fixed result. Re-derive every concrete detail (library list, chains, stage count) from the current upstream file on each run.
 
-- Source: `https://raw.githubusercontent.com/wader/static-ffmpeg/refs/heads/master/Dockerfile`. Fetch it fresh and read the whole file.
+- Source and output: as the user names them. Read the whole source; never write over it, so its `diff -u` against the result stays the review artifact.
 - Keep unchanged: the Alpine version, every library version, and every build command/flag. Only the stage structure changes.
 - Put `# syntax=docker/dockerfile:1` as line 1.
 

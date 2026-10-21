@@ -4,7 +4,7 @@
 
 Tidy up the original: whatever the recipes do in the same way is written in the same way. For the downloads that means how they are named, where their URLs live and how they are bumped; for everything else, that an outlier follows its peers. The sources themselves stay exactly as they are — same hosts, protocols, archives, commits and versions — and so does the built `ffmpeg`.
 
-- Output: a cleaned variant next to the input (today `Dockerfile.clean`); the `diff -u` against the input is the review artifact.
+- Source and output: as the user names them. Read the whole source; never write over it, so its `diff -u` against the result stays the review artifact.
 - Change only what a renaming, a move or an alignment requires (for a download: its `ARG`s, checksum, extraction, `cd`, taking over the moved source) and bump lines.
 - Out of scope: any change of source — another host, protocol, archive type, git replaced by an archive, another version; downloads a recipe triggers by itself during the build; caching.
 
