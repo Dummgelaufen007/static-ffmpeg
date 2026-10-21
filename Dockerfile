@@ -216,7 +216,7 @@ ARG LIBRSVG_VERSION=2.63.3
 ARG LIBRSVG_URL="https://download.gnome.org/sources/librsvg/${LIBRSVG_VERSION%.*}/librsvg-$LIBRSVG_VERSION.tar.xz"
 ARG LIBRSVG_FILE="librsvg.$LIBRSVG_VERSION.tar.xz"
 ARG LIBRSVG_SHA256=55311c2293612e4a2e38cd9bdb6160a1c85c158adc7c97e423e1e65949afb6a4
-RUN \
+RUN --mount=type=cache,target=/root/.cargo/registry --mount=type=cache,target=/root/.cargo/git \
   wget -O $LIBRSVG_FILE $WGET_OPTS "$LIBRSVG_URL" && \
   echo "$LIBRSVG_SHA256  $LIBRSVG_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $LIBRSVG_FILE && \
@@ -680,7 +680,7 @@ ARG RAV1E_VERSION=0.8.1
 ARG RAV1E_URL="https://github.com/xiph/rav1e/archive/v$RAV1E_VERSION.tar.gz"
 ARG RAV1E_FILE="rav1e.$RAV1E_VERSION.tar.gz"
 ARG RAV1E_SHA256=06d1523955fb6ed9cf9992eace772121067cca7e8926988a1ee16492febbe01e
-RUN \
+RUN --mount=type=cache,target=/root/.cargo/registry --mount=type=cache,target=/root/.cargo/git \
   wget -O $RAV1E_FILE $WGET_OPTS "$RAV1E_URL" && \
   echo "$RAV1E_SHA256  $RAV1E_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $RAV1E_FILE && \
