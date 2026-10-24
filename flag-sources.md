@@ -246,8 +246,22 @@ Source: [Steam Hardware Survey](https://store.steampowered.com/hwsurvey/) (unver
 | Point | Finding | Source |
 |---|---|---|
 | Failure | `ADD` of `downloads.sourceforge.net/modplug-xmms/libmodplug-0.8.9.0.tar.gz` and of `sourceforge.net/projects/opencore-amr/files/opencore-amr/opencore-amr-0.1.6.tar.gz` gets sourceforge's HTML page "Download … (…)" instead of the archive, with different content on every request; with `--checksum` the build stops with a digest mismatch. `wget` gets the archive from the same URLs | measured: 20 of 20 and 10 of 10 HTML; build logs of bellair and gaming |
-| Fix | the `…/download` form of the link, which lame already uses, returns the archive to `ADD`: `sourceforge.net/projects/modplug-xmms/files/libmodplug/<v>/libmodplug-<v>.tar.gz/download`, `sourceforge.net/projects/opencore-amr/files/opencore-amr/opencore-amr-<v>.tar.gz/download` | measured: 10 of 10 each with the expected checksum; lame 20 of 20 |
+| Fix | the direct form `downloads.sourceforge.net/project/<project>/<path>/<file>` returns the archive to `ADD` with one redirect to the mirror (302 → 200), one fewer than the `…/download` form (302 → 302 → 200) and three fewer than the file page link (301 → 301 → 302 → 302 → 200); all three sourceforge sources use it: `downloads.sourceforge.net/project/modplug-xmms/libmodplug/<v>/libmodplug-<v>.tar.gz`, `downloads.sourceforge.net/project/lame/lame/<v>/lame-<v>.tar.gz`, `downloads.sourceforge.net/project/opencore-amr/opencore-amr/opencore-amr-<v>.tar.gz` | measured on bellair: 10 of 10 `ADD` runs of all three with the expected checksum, build cache emptied before each run; redirect chains with `curl`, one request per URL |
 | Mirrors | every sourceforge link redirects to a mirror that changes from request to request; all other archive URLs go to one fixed host | measured: two requests per URL |
+
+## Smaller source tarballs
+
+The same release in a smaller compression; the checksum changes with the file, the unpacked top directory stays what the `cd` of each block expects.
+
+| Library | Dockerfile | Dockerfile.opt | Source |
+|---|---|---|---|
+| cairo | `gitlab.freedesktop.org/cairo/cairo/-/archive/<v>/cairo-<v>.tar.gz` | `cairographics.org/releases/cairo-<v>.tar.xz` | [cairographics.org/releases](https://cairographics.org/releases/) |
+| libass | `libass-<v>.tar.gz` | `libass-<v>.tar.xz` | [github.com/libass/libass/releases](https://github.com/libass/libass/releases) |
+| libssh | `libssh-mirror-libssh-<v>.tar.gz` | `libssh-mirror-libssh-<v>.tar.bz2` | gitlab archive endpoint of the same tag |
+| ogg | `libogg-<v>.tar.gz` | `libogg-<v>.tar.xz` | [downloads.xiph.org/releases/ogg](https://downloads.xiph.org/releases/ogg/) |
+| vorbis | `libvorbis-<v>.tar.gz` | `libvorbis-<v>.tar.xz` | [downloads.xiph.org/releases/vorbis](https://downloads.xiph.org/releases/vorbis/) |
+| xvid | `xvidcore-<v>.tar.gz` | `xvidcore-<v>.tar.bz2` | [downloads.xvid.com/downloads](https://downloads.xvid.com/downloads/) |
+| ffmpeg | `ffmpeg-<v>.tar.bz2` | `ffmpeg-<v>.tar.xz` | [ffmpeg.org/releases](https://ffmpeg.org/releases/) |
 
 ## Git sources
 
