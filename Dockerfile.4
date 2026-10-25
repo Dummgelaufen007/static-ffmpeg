@@ -593,10 +593,10 @@ RUN sed -i 's/-Wl,--export-dynamic//' /usr/local/lib/pkgconfig/gmodule-2.0.pc /u
 # bump: harfbuzz /LIBHARFBUZZ_VERSION=([\d.]+)/ https://github.com/harfbuzz/harfbuzz.git|*
 # bump: harfbuzz after ./hashupdate Dockerfile LIBHARFBUZZ $LATEST
 # bump: harfbuzz link "NEWS" https://github.com/harfbuzz/harfbuzz/blob/main/NEWS
-ARG LIBHARFBUZZ_VERSION=14.6.0
+ARG LIBHARFBUZZ_VERSION=15.0.0
 ARG LIBHARFBUZZ_URL="https://github.com/harfbuzz/harfbuzz/releases/download/$LIBHARFBUZZ_VERSION/harfbuzz-$LIBHARFBUZZ_VERSION.tar.xz"
 ARG LIBHARFBUZZ_FILE="libharfbuzz.$LIBHARFBUZZ_VERSION.tar.xz"
-ARG LIBHARFBUZZ_SHA256=d07a007327277708a2a73ae437887cdbaf282937f6d03ca5467723e9099af586
+ARG LIBHARFBUZZ_SHA256=968536e9abd782f07f7954044c0c4020199fcdd39b41d221ec42d2a3be4a44df
 ADD --checksum=sha256:$LIBHARFBUZZ_SHA256 --unpack=true $LIBHARFBUZZ_URL /
 RUN \
   cd harfbuzz-* && \
@@ -660,10 +660,10 @@ RUN \
 # bump: librsvg /LIBRSVG_VERSION=([\d.]+)/ https://gitlab.gnome.org/GNOME/librsvg.git|^2
 # bump: librsvg after ./hashupdate Dockerfile LIBRSVG $LATEST
 # bump: librsvg link "NEWS" https://gitlab.gnome.org/GNOME/librsvg/-/blob/master/NEWS
-ARG LIBRSVG_VERSION=2.63.3
+ARG LIBRSVG_VERSION=2.63.4
 ARG LIBRSVG_URL="https://download.gnome.org/sources/librsvg/${LIBRSVG_VERSION%.*}/librsvg-$LIBRSVG_VERSION.tar.xz"
 ARG LIBRSVG_FILE="librsvg.$LIBRSVG_VERSION.tar.xz"
-ARG LIBRSVG_SHA256=55311c2293612e4a2e38cd9bdb6160a1c85c158adc7c97e423e1e65949afb6a4
+ARG LIBRSVG_SHA256=31f07d9350dad3f8964fd613c31309ac160fdef13dfac59df6fd082de78d6e8f
 ADD --checksum=sha256:$LIBRSVG_SHA256 --unpack=true $LIBRSVG_URL /
 RUN --mount=type=cache,target=/root/.cargo/registry --mount=type=cache,target=/root/.cargo/git \
   cd librsvg-* && \
@@ -721,15 +721,46 @@ ARG LIBARIBB24_VERSION=1.0.3
 ARG LIBARIBB24_URL="https://github.com/nkoriyama/aribb24/archive/v$LIBARIBB24_VERSION.tar.gz"
 ARG LIBARIBB24_FILE="libaribb24.$LIBARIBB24_VERSION.tar.gz"
 ARG LIBARIBB24_SHA256=f61560738926e57f9173510389634d8c06cabedfa857db4b28fb7704707ff128
+# decoder fixes of the open upstream pull requests 12, 13 and 17
+ARG LIBARIBB24_PR12_URL="https://github.com/nkoriyama/aribb24/commit/a5bcc6d17c20e18bdeec295089cc0cdfac9d35c8.patch"
+ARG LIBARIBB24_PR12_FILE="libaribb24.pr12.patch"
+ARG LIBARIBB24_PR12_SHA256=9059639e9577b123ac4ab3b53771e947b791c42d07b0444cf90e82f563d6d261
+ARG LIBARIBB24_PR13_URL="https://github.com/nkoriyama/aribb24/commit/facc51923d43f26dec09a9391566de7cba29f8db.patch"
+ARG LIBARIBB24_PR13_FILE="libaribb24.pr13.patch"
+ARG LIBARIBB24_PR13_SHA256=4812661f1c77ec06a5a12548f166ac8646d4c7c1574848a005f0578f3d8cfc7c
+ARG LIBARIBB24_PR17_URL="https://github.com/nkoriyama/aribb24/commit/58a34b8fabf4d0e9e1984fb603a97f52fb934a09.patch"
+ARG LIBARIBB24_PR17_FILE="libaribb24.pr17.patch"
+ARG LIBARIBB24_PR17_SHA256=1a4fc77f677a6ff87d024e3a218186160b23620c84dbd791ec5c425de0a8e6c2
 ADD --checksum=sha256:$LIBARIBB24_SHA256 --unpack=true $LIBARIBB24_URL /
+ADD --checksum=sha256:$LIBARIBB24_PR12_SHA256 $LIBARIBB24_PR12_URL /$LIBARIBB24_PR12_FILE
+ADD --checksum=sha256:$LIBARIBB24_PR13_SHA256 $LIBARIBB24_PR13_URL /$LIBARIBB24_PR13_FILE
+ADD --checksum=sha256:$LIBARIBB24_PR17_SHA256 $LIBARIBB24_PR17_URL /$LIBARIBB24_PR17_FILE
 RUN \
   cd aribb24-* && \
+  for p in $LIBARIBB24_PR12_FILE $LIBARIBB24_PR13_FILE $LIBARIBB24_PR17_FILE; do patch -p1 < ../$p || exit 1; done && \
   autoreconf -fiv && \
   ./configure \
     --disable-dependency-tracking \
     --enable-static \
     --disable-shared && \
   make -j$(nproc) && make install
+
+# before libass, which uses it for unicode line breaking; alpine has no static build
+# bump: libunibreak /LIBUNIBREAK_VERSION=([\d.]+)/ gitrefs:https://github.com/adah1972/libunibreak.git|re:#^refs/tags/libunibreak_(\d+)_(\d+)$#${1}.${2}#|*
+# bump: libunibreak after sed -i -E "s#/libunibreak_[0-9_]+/#/libunibreak_$(echo $LATEST | tr . _)/#" Dockerfile && ./hashupdate Dockerfile LIBUNIBREAK $LATEST
+# bump: libunibreak link "NEWS" https://github.com/adah1972/libunibreak/blob/master/NEWS
+ARG LIBUNIBREAK_VERSION=8.0
+ARG LIBUNIBREAK_URL="https://github.com/adah1972/libunibreak/releases/download/libunibreak_8_0/libunibreak-$LIBUNIBREAK_VERSION.tar.gz"
+ARG LIBUNIBREAK_FILE="libunibreak.$LIBUNIBREAK_VERSION.tar.gz"
+ARG LIBUNIBREAK_SHA256=9c4fad6e517338a098373acc9f35579ae2c325e6446666fb9ac2666ba15ceba4
+ADD --checksum=sha256:$LIBUNIBREAK_SHA256 --unpack=true $LIBUNIBREAK_URL /
+RUN \
+  cd libunibreak-* && \
+  ./configure \
+    --disable-dependency-tracking \
+    --disable-shared \
+    --enable-static && \
+  make -j$(nproc) install
 
 # bump: libass /LIBASS_VERSION=([\d.]+)/ https://github.com/libass/libass.git|*
 # bump: libass after ./hashupdate Dockerfile LIBASS $LATEST
@@ -743,6 +774,7 @@ RUN \
   cd libass-* && \
   ./configure \
     --disable-dependency-tracking \
+    --enable-libunibreak \
     --disable-shared \
     --enable-static && \
   make -j$(nproc) && make install
@@ -1816,6 +1848,7 @@ RUN \
   libsvtav1: env.SVTAV1_VERSION, \
   libtheora: env.THEORA_VERSION, \
   libtwolame: env.TWOLAME_VERSION, \
+  libunibreak: env.LIBUNIBREAK_VERSION, \
   libuavs3d: env.UAVS3D_VERSION, \
   libvidstab: env.VIDSTAB_VERSION, \
   libvmaf: env.VMAF_VERSION, \
