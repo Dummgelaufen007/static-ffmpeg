@@ -1,25 +1,10 @@
+# syntax=docker/dockerfile:1
 # bump: alpine /ALPINE_VERSION=alpine:([\d.]+)/ docker:alpine|^3
 # bump: alpine link "Release notes" https://alpinelinux.org/posts/Alpine-$LATEST-released.html
 ARG ALPINE_VERSION=alpine:3.24.3
-FROM $ALPINE_VERSION AS alpine
-# over http, so a caching proxy passed as http_proxy can store the packages
-RUN [ -z "$http_proxy" ] || sed -i 's|^https:|http:|' /etc/apk/repositories
-
-FROM scratch AS downloads
-
-FROM alpine AS downloader
-ARG APK_OPTS=""
-RUN apk add --no-cache $APK_OPTS bash wget git
-COPY --from=downloads / /downloads/
-ARG DOCKERFILE=Dockerfile
-ARG ENABLE_FDKAAC=
-ARG ENABLE_LIBDVDCSS=
-ARG OPTIONAL_DOWNLOADS="FDK_AAC=ENABLE_FDKAAC LIBDVDCSS=ENABLE_LIBDVDCSS"
-RUN --mount=src=$DOCKERFILE,dst=/Dockerfile --mount=src=download.sh,dst=/download.sh \
-  bash /download.sh /Dockerfile /downloads
 
 # the autoreconf needs gettext-dev, which conflicts with the musl-libintl glib uses in the builder
-FROM alpine AS zvbi
+FROM $ALPINE_VERSION AS zvbi
 ARG APK_OPTS=""
 RUN apk add --no-cache $APK_OPTS autoconf automake libtool gettext-dev
 # bump: zvbi /ZVBI_VERSION=([\d.]+)/ https://github.com/zapping-vbi/zvbi.git|*
@@ -29,14 +14,13 @@ ARG ZVBI_VERSION=0.2.45
 ARG ZVBI_URL="https://github.com/zapping-vbi/zvbi/archive/refs/tags/v$ZVBI_VERSION.tar.gz"
 ARG ZVBI_FILE="zvbi.$ZVBI_VERSION.tar.gz"
 ARG ZVBI_SHA256=e6c954fde2a5a635187f19e1ab870a88c1a982012c5f1b33b8f2513e0ab7a50e
-COPY --from=downloader /downloads/$ZVBI_FILE /
+ADD --checksum=sha256:$ZVBI_SHA256 --unpack=true $ZVBI_URL /
 RUN \
-  mkdir zvbi && \
-  tar --no-same-owner --extract --file $ZVBI_FILE -C zvbi --strip-components=1 && \
+  mv zvbi-* zvbi && \
   cd zvbi && \
   autoreconf -fiv
 
-FROM alpine AS builder
+FROM $ALPINE_VERSION AS builder
 
 # Alpine Package Keeper options
 ARG APK_OPTS=""
@@ -44,12 +28,10 @@ ARG APK_OPTS=""
 RUN apk add --no-cache $APK_OPTS \
   coreutils \
   pkgconfig \
-  wget \
   rust cargo cargo-c \
   openssl-dev openssl-libs-static \
   ca-certificates \
   bash \
-  tar \
   build-base \
   autoconf automake \
   libtool \
@@ -85,8 +67,6 @@ RUN apk add --no-cache $APK_OPTS \
 # pcre2-dev pcre2-static libffi-dev musl-libintl replace the pcre2, libffi and proxy-libintl downloads of glib
 # pixman-dev pixman-static replace the pixman download of cairo
 
-COPY --from=downloader /downloads/ /
-
 # -O3 makes sure we compile with optimization. setting CFLAGS/CXXFLAGS seems to override
 # default automake cflags.
 # -static-libgcc is needed to make gcc not include gcc_s as "as-needed" shared library which
@@ -95,12 +75,6 @@ COPY --from=downloader /downloads/ /
 ARG CFLAGS="-O3 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
 ARG CXXFLAGS="-O3 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
 ARG LDFLAGS="-Wl,-z,relro,-z,now"
-
-# retry dns and some http codes that might be transient errors
-ARG WGET_OPTS="--tries=10 --connect-timeout=10 --retry-connrefused --retry-on-host-error --retry-on-http-error=429,500,502,503,504"
-
-# --no-same-owner as we don't care about uid/gid even if we run as root. fixes invalid gid/uid issue.
-ARG TAR_OPTS="--no-same-owner --extract --file"
 
 # before aom as libvmaf uses it
 # bump: vmaf /VMAF_VERSION=([\d.]+)/ https://github.com/Netflix/vmaf.git|*
@@ -111,8 +85,8 @@ ARG VMAF_VERSION=3.2.1
 ARG VMAF_URL="https://github.com/Netflix/vmaf/archive/refs/tags/v$VMAF_VERSION.tar.gz"
 ARG VMAF_FILE="vmaf.$VMAF_VERSION.tar.gz"
 ARG VMAF_SHA256=5df7386911bc15fd1ca783132528748d219768ae4fc5f8e0b61184f041648092
+ADD --checksum=sha256:$VMAF_SHA256 --unpack=true $VMAF_URL /
 RUN \
-  tar $TAR_OPTS $VMAF_FILE && \
   cd vmaf-*/libvmaf && \
   meson setup build \
     -Dbuildtype=release \
@@ -135,8 +109,8 @@ ARG GLIB_VERSION=2.90.1
 ARG GLIB_URL="https://download.gnome.org/sources/glib/${GLIB_VERSION%.*}/glib-$GLIB_VERSION.tar.xz"
 ARG GLIB_FILE="glib.$GLIB_VERSION.tar.xz"
 ARG GLIB_SHA256=93c941aa17d5eb1d53fe838365f29a8b4e539c222a256d974ec8f30fc413e396
+ADD --checksum=sha256:$GLIB_SHA256 --unpack=true $GLIB_URL /
 RUN \
-  tar $TAR_OPTS $GLIB_FILE && \
   cd glib-* && \
   meson setup build \
     -Dbuildtype=release \
@@ -158,8 +132,8 @@ ARG LIBHARFBUZZ_VERSION=14.6.0
 ARG LIBHARFBUZZ_URL="https://github.com/harfbuzz/harfbuzz/releases/download/$LIBHARFBUZZ_VERSION/harfbuzz-$LIBHARFBUZZ_VERSION.tar.xz"
 ARG LIBHARFBUZZ_FILE="libharfbuzz.$LIBHARFBUZZ_VERSION.tar.xz"
 ARG LIBHARFBUZZ_SHA256=d07a007327277708a2a73ae437887cdbaf282937f6d03ca5467723e9099af586
+ADD --checksum=sha256:$LIBHARFBUZZ_SHA256 --unpack=true $LIBHARFBUZZ_URL /
 RUN \
-  tar $TAR_OPTS $LIBHARFBUZZ_FILE && \
   cd harfbuzz-* && \
   meson setup build \
     -Dbuildtype=release \
@@ -180,8 +154,8 @@ ARG CAIRO_VERSION=1.18.6
 ARG CAIRO_URL="https://cairographics.org/releases/cairo-$CAIRO_VERSION.tar.xz"
 ARG CAIRO_FILE="cairo.$CAIRO_VERSION.tar.xz"
 ARG CAIRO_SHA256=1c767308174337a74694da0f3ec069c271452163a1ef4540964c50c301f157d4
+ADD --checksum=sha256:$CAIRO_SHA256 --unpack=true $CAIRO_URL /
 RUN \
-  tar $TAR_OPTS $CAIRO_FILE && \
   cd cairo-* && \
   meson setup build \
     -Dbuildtype=release \
@@ -203,8 +177,8 @@ ARG PANGO_VERSION=1.58.2
 ARG PANGO_URL="https://download.gnome.org/sources/pango/${PANGO_VERSION%.*}/pango-$PANGO_VERSION.tar.xz"
 ARG PANGO_FILE="pango.$PANGO_VERSION.tar.xz"
 ARG PANGO_SHA256=342385b6ca3b7c73455d7c80a13b7dbe4489e00bc3bd4c5bd6ed4dce421e374a
+ADD --checksum=sha256:$PANGO_SHA256 --unpack=true $PANGO_URL /
 RUN \
-  tar $TAR_OPTS $PANGO_FILE && \
   cd pango-* && \
   meson setup build \
     -Dbuildtype=release \
@@ -224,8 +198,8 @@ ARG DAV1D_VERSION=1.5.4
 ARG DAV1D_URL="https://download.videolan.org/pub/videolan/dav1d/$DAV1D_VERSION/dav1d-$DAV1D_VERSION.tar.xz"
 ARG DAV1D_FILE="dav1d.$DAV1D_VERSION.tar.xz"
 ARG DAV1D_SHA256=686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5
+ADD --checksum=sha256:$DAV1D_SHA256 --unpack=true $DAV1D_URL /
 RUN \
-  tar $TAR_OPTS $DAV1D_FILE && \
   cd dav1d-* && \
   meson setup build \
     -Dbuildtype=release \
@@ -241,8 +215,8 @@ ARG LIBRSVG_VERSION=2.63.3
 ARG LIBRSVG_URL="https://download.gnome.org/sources/librsvg/${LIBRSVG_VERSION%.*}/librsvg-$LIBRSVG_VERSION.tar.xz"
 ARG LIBRSVG_FILE="librsvg.$LIBRSVG_VERSION.tar.xz"
 ARG LIBRSVG_SHA256=55311c2293612e4a2e38cd9bdb6160a1c85c158adc7c97e423e1e65949afb6a4
+ADD --checksum=sha256:$LIBRSVG_SHA256 --unpack=true $LIBRSVG_URL /
 RUN --mount=type=cache,target=/root/.cargo/registry --mount=type=cache,target=/root/.cargo/git \
-  tar $TAR_OPTS $LIBRSVG_FILE && \
   cd librsvg-* && \
   # workaround for https://gitlab.gnome.org/GNOME/librsvg/-/issues/1158
   sed -i "/^if host_system in \['windows'/s/, 'linux'//" meson.build && \
@@ -267,8 +241,8 @@ ARG AOM_VERSION=3.15.2
 ARG AOM_URL="https://storage.googleapis.com/aom-releases/libaom-$AOM_VERSION.tar.gz"
 ARG AOM_FILE="aom.$AOM_VERSION.tar.gz"
 ARG AOM_SHA256=67bb54b245f33ed98600e08269e6139986e48114e14042474ddd8885801dfddc
+ADD --checksum=sha256:$AOM_SHA256 --unpack=true $AOM_URL /
 RUN \
-  tar $TAR_OPTS $AOM_FILE && \
   cd libaom-* && \
   # tune=vmaf without vmaf-model-path falls back to the model built into libvmaf
   sed -i 's/^    vmaf_fatal_error("Failed to load VMAF model.");/    if (vmaf_model_load(vmaf_model, \&model_cfg, "vmaf_v0.6.1")) &/' aom_dsp/vmaf.c && \
@@ -310,8 +284,11 @@ ARG LIBARIBB24_PR13_SHA256=4812661f1c77ec06a5a12548f166ac8646d4c7c1574848a005f05
 ARG LIBARIBB24_PR17_URL="https://github.com/nkoriyama/aribb24/commit/58a34b8fabf4d0e9e1984fb603a97f52fb934a09.patch"
 ARG LIBARIBB24_PR17_FILE="libaribb24.pr17.patch"
 ARG LIBARIBB24_PR17_SHA256=1a4fc77f677a6ff87d024e3a218186160b23620c84dbd791ec5c425de0a8e6c2
+ADD --checksum=sha256:$LIBARIBB24_SHA256 --unpack=true $LIBARIBB24_URL /
+ADD --checksum=sha256:$LIBARIBB24_PR12_SHA256 $LIBARIBB24_PR12_URL /$LIBARIBB24_PR12_FILE
+ADD --checksum=sha256:$LIBARIBB24_PR13_SHA256 $LIBARIBB24_PR13_URL /$LIBARIBB24_PR13_FILE
+ADD --checksum=sha256:$LIBARIBB24_PR17_SHA256 $LIBARIBB24_PR17_URL /$LIBARIBB24_PR17_FILE
 RUN \
-  tar $TAR_OPTS $LIBARIBB24_FILE && \
   cd aribb24-* && \
   for p in $LIBARIBB24_PR12_FILE $LIBARIBB24_PR13_FILE $LIBARIBB24_PR17_FILE; do patch -p1 < ../$p || exit 1; done && \
   autoreconf -fiv && \
@@ -328,8 +305,8 @@ ARG CHROMAPRINT_VERSION=1.6.1
 ARG CHROMAPRINT_URL="https://github.com/acoustid/chromaprint/releases/download/v$CHROMAPRINT_VERSION/chromaprint-$CHROMAPRINT_VERSION.tar.gz"
 ARG CHROMAPRINT_FILE="chromaprint.$CHROMAPRINT_VERSION.tar.gz"
 ARG CHROMAPRINT_SHA256=3368805af0ee47b9df74df10b5001a44569e01df2844dab520031720dde9ad23
+ADD --checksum=sha256:$CHROMAPRINT_SHA256 --unpack=true $CHROMAPRINT_URL /
 RUN \
-  tar $TAR_OPTS $CHROMAPRINT_FILE && \
   cd chromaprint-* && \
   cmake -B build \
     -G"Unix Makefiles" \
@@ -351,8 +328,8 @@ ARG LIBUNIBREAK_VERSION=8.0
 ARG LIBUNIBREAK_URL="https://github.com/adah1972/libunibreak/releases/download/libunibreak_8_0/libunibreak-$LIBUNIBREAK_VERSION.tar.gz"
 ARG LIBUNIBREAK_FILE="libunibreak.$LIBUNIBREAK_VERSION.tar.gz"
 ARG LIBUNIBREAK_SHA256=9c4fad6e517338a098373acc9f35579ae2c325e6446666fb9ac2666ba15ceba4
+ADD --checksum=sha256:$LIBUNIBREAK_SHA256 --unpack=true $LIBUNIBREAK_URL /
 RUN \
-  tar $TAR_OPTS $LIBUNIBREAK_FILE && \
   cd libunibreak-* && \
   ./configure \
     --disable-dependency-tracking \
@@ -367,8 +344,8 @@ ARG LIBASS_VERSION=0.17.5
 ARG LIBASS_URL="https://github.com/libass/libass/releases/download/$LIBASS_VERSION/libass-$LIBASS_VERSION.tar.xz"
 ARG LIBASS_FILE="libass.$LIBASS_VERSION.tar.xz"
 ARG LIBASS_SHA256=2dca25c0e0c837ddf00b52011b3f82cac1e4ddd3ad018227806b0c2288864acc
+ADD --checksum=sha256:$LIBASS_SHA256 --unpack=true $LIBASS_URL /
 RUN \
-  tar $TAR_OPTS $LIBASS_FILE && \
   cd libass-* && \
   ./configure \
     --disable-dependency-tracking \
@@ -384,8 +361,8 @@ ARG LIBUDFREAD_VERSION=1.2.0
 ARG LIBUDFREAD_URL="https://download.videolan.org/pub/videolan/libudfread/libudfread-$LIBUDFREAD_VERSION.tar.xz"
 ARG LIBUDFREAD_FILE="libudfread.$LIBUDFREAD_VERSION.tar.xz"
 ARG LIBUDFREAD_SHA256=bb477cbd4cfbfc7787d9d05b71ee5e70430f5cfebf1297497f7e83547958050f
+ADD --checksum=sha256:$LIBUDFREAD_SHA256 --unpack=true $LIBUDFREAD_URL /
 RUN \
-  tar $TAR_OPTS $LIBUDFREAD_FILE && \
   cd libudfread-* && \
   meson setup build \
     -Dbuildtype=release \
@@ -399,8 +376,8 @@ ARG LIBBLURAY_VERSION=1.5.0
 ARG LIBBLURAY_URL="https://download.videolan.org/pub/videolan/libbluray/$LIBBLURAY_VERSION/libbluray-$LIBBLURAY_VERSION.tar.xz"
 ARG LIBBLURAY_FILE="libbluray.$LIBBLURAY_VERSION.tar.xz"
 ARG LIBBLURAY_SHA256=f676408e91a5d321abf8b8d4dfdae36205c297dab5c54c3ec519639025f474a2
+ADD --checksum=sha256:$LIBBLURAY_SHA256 --unpack=true $LIBBLURAY_URL /
 RUN \
-  tar $TAR_OPTS $LIBBLURAY_FILE && \
   cd libbluray-* && \
   meson setup build \
     -Dbuildtype=release \
@@ -417,9 +394,9 @@ ARG LIBDVDCSS_URL="https://download.videolan.org/pub/videolan/libdvdcss/$LIBDVDC
 ARG LIBDVDCSS_FILE="libdvdcss.$LIBDVDCSS_VERSION.tar.xz"
 ARG LIBDVDCSS_SHA256=7ea556c846b7bfc32d47b41cae56d1863a6b6d5f706bb162778d6f298490977c
 ARG ENABLE_LIBDVDCSS=
+ADD --checksum=sha256:$LIBDVDCSS_SHA256 --unpack=true $LIBDVDCSS_URL /
 RUN \
   if [[ -n "$ENABLE_LIBDVDCSS" ]]; then \
-  tar $TAR_OPTS $LIBDVDCSS_FILE && \
   cd libdvdcss-* && \
   meson setup build \
     -Dbuildtype=release \
@@ -435,8 +412,8 @@ ARG LIBDVDREAD_URL="https://download.videolan.org/pub/videolan/libdvdread/$LIBDV
 ARG LIBDVDREAD_FILE="libdvdread.$LIBDVDREAD_VERSION.tar.xz"
 ARG LIBDVDREAD_SHA256=a0d47876548bec806774bbf8dbf20bb19ba139464383156b32eb8e59915b90a9
 # without libdvdcss linked in, libdvdread tries to dlopen it, which a static binary cannot
+ADD --checksum=sha256:$LIBDVDREAD_SHA256 --unpack=true $LIBDVDREAD_URL /
 RUN \
-  tar $TAR_OPTS $LIBDVDREAD_FILE && \
   cd libdvdread-* && \
   meson setup build \
     -Dbuildtype=release \
@@ -453,8 +430,8 @@ ARG LIBDVDNAV_VERSION=7.0.0
 ARG LIBDVDNAV_URL="https://download.videolan.org/pub/videolan/libdvdnav/$LIBDVDNAV_VERSION/libdvdnav-$LIBDVDNAV_VERSION.tar.xz"
 ARG LIBDVDNAV_FILE="libdvdnav.$LIBDVDNAV_VERSION.tar.xz"
 ARG LIBDVDNAV_SHA256=a2a18f5ad36d133c74bf9106b6445806fa253b09141a46392550394b647b221e
+ADD --checksum=sha256:$LIBDVDNAV_SHA256 --unpack=true $LIBDVDNAV_URL /
 RUN \
-  tar $TAR_OPTS $LIBDVDNAV_FILE && \
   cd libdvdnav-* && \
   meson setup build \
     -Dbuildtype=release \
@@ -469,8 +446,8 @@ ARG DAVS2_VERSION=1.7
 ARG DAVS2_URL="https://github.com/pkuvcl/davs2/archive/refs/tags/$DAVS2_VERSION.tar.gz"
 ARG DAVS2_FILE="davs2.$DAVS2_VERSION.tar.gz"
 ARG DAVS2_SHA256=b697d0b376a1c7f7eda3a4cc6d29707c8154c4774358303653f0a9727f923cc8
+ADD --checksum=sha256:$DAVS2_SHA256 --unpack=true $DAVS2_URL /
 RUN \
-  tar $TAR_OPTS $DAVS2_FILE && \
   cd davs2-*/build/linux && \
   # the source has assembler for x86 only
   ./configure \
@@ -489,9 +466,9 @@ ARG FDK_AAC_URL="https://github.com/mstorsjo/fdk-aac/archive/v$FDK_AAC_VERSION.t
 ARG FDK_AAC_FILE="fdk-aac.$FDK_AAC_VERSION.tar.gz"
 ARG FDK_AAC_SHA256=8538ea8f0f9915e460c106a13e1866a9e13c7ee48c1b67d0b2cf7b4e8159bd1a
 ARG ENABLE_FDKAAC=
+ADD --checksum=sha256:$FDK_AAC_SHA256 --unpack=true $FDK_AAC_URL /
 RUN \
   if [[ -n "$ENABLE_FDKAAC" ]]; then \
-  tar $TAR_OPTS $FDK_AAC_FILE && \
   cd fdk-aac-* && \
   ./autogen.sh && \
   ./configure \
@@ -508,8 +485,8 @@ ARG LIBGME_VERSION=0.6.5
 ARG LIBGME_URL="https://github.com/libgme/game-music-emu/releases/download/$LIBGME_VERSION/libgme-$LIBGME_VERSION-src.tar.gz"
 ARG LIBGME_FILE="libgme.$LIBGME_VERSION.tar.gz"
 ARG LIBGME_SHA256=a133f19278222136ba0d8c27b64a07987ba05fec9d2e6d293ccd8cabdd97ddbb
+ADD --checksum=sha256:$LIBGME_SHA256 --unpack=true $LIBGME_URL /
 RUN \
-  tar $TAR_OPTS $LIBGME_FILE && \
   cd libgme-* && \
   mkdir build && \
   cd build && \
@@ -529,8 +506,8 @@ ARG LIBGSM_VERSION=1.0.24
 ARG LIBGSM_URL="https://www.quut.com/gsm/gsm-$LIBGSM_VERSION.tar.gz"
 ARG LIBGSM_FILE="libgsm.$LIBGSM_VERSION.tar.gz"
 ARG LIBGSM_SHA256=a3c40c6471928383f4abfcb2e8f24012a1f562be2f17b8d672145d5986681a92
+ADD --checksum=sha256:$LIBGSM_SHA256 --unpack=true $LIBGSM_URL /
 RUN \
-  tar $TAR_OPTS $LIBGSM_FILE && \
   cd gsm-* && \
   # Makefile is hard to use, hence use specific compile arguments and flags
   # no need to build toast cli tool \
@@ -549,8 +526,8 @@ ARG KVAZAAR_VERSION=2.3.2
 ARG KVAZAAR_URL="https://github.com/ultravideo/kvazaar/archive/v$KVAZAAR_VERSION.tar.gz"
 ARG KVAZAAR_FILE="kvazaar.$KVAZAAR_VERSION.tar.gz"
 ARG KVAZAAR_SHA256=ddd0038696631ca5368d8e40efee36d2bbb805854b9b1dda8b12ea9b397ea951
+ADD --checksum=sha256:$KVAZAAR_SHA256 --unpack=true $KVAZAAR_URL /
 RUN \
-  tar $TAR_OPTS $KVAZAAR_FILE && \
   cd kvazaar-* && \
   ./autogen.sh && \
   ./configure \
@@ -566,8 +543,8 @@ ARG LIBMODPLUG_VERSION=0.8.9.0
 ARG LIBMODPLUG_URL="https://downloads.sourceforge.net/project/modplug-xmms/libmodplug/$LIBMODPLUG_VERSION/libmodplug-$LIBMODPLUG_VERSION.tar.gz"
 ARG LIBMODPLUG_FILE="libmodplug.$LIBMODPLUG_VERSION.tar.gz"
 ARG LIBMODPLUG_SHA256=457ca5a6c179656d66c01505c0d95fafaead4329b9dbaa0f997d00a3508ad9de
+ADD --checksum=sha256:$LIBMODPLUG_SHA256 --unpack=true $LIBMODPLUG_URL /
 RUN \
-  tar $TAR_OPTS $LIBMODPLUG_FILE && \
   cd libmodplug-* && \
   ./configure \
     --disable-dependency-tracking \
@@ -582,8 +559,8 @@ ARG MP3LAME_VERSION=4.0
 ARG MP3LAME_URL="https://downloads.sourceforge.net/project/lame/lame/$MP3LAME_VERSION/lame-$MP3LAME_VERSION.tar.gz"
 ARG MP3LAME_FILE="mp3lame.$MP3LAME_VERSION.tar.gz"
 ARG MP3LAME_SHA256=3df5124d5ad3a98312ffd7ba6a9b36230e4f8a3e66d3ce0f425e336c32d216eb
+ADD --checksum=sha256:$MP3LAME_SHA256 --unpack=true $MP3LAME_URL /
 RUN \
-  tar $TAR_OPTS $MP3LAME_FILE && \
   cd lame-* && \
   # configure never sets NDEBUG, the encoder is full of asserts
   CFLAGS="$CFLAGS -DNDEBUG" \
@@ -606,8 +583,8 @@ ARG LCMS2_VERSION=2.19.1
 ARG LCMS2_URL="https://github.com/mm2/Little-CMS/releases/download/lcms$LCMS2_VERSION/lcms2-$LCMS2_VERSION.tar.gz"
 ARG LCMS2_FILE="lcms2.$LCMS2_VERSION.tar.gz"
 ARG LCMS2_SHA256=bfc54f7bab59fbc921012014a8032e4cba4abd46db47d46b76416a8c0b2815c8
+ADD --checksum=sha256:$LCMS2_SHA256 --unpack=true $LCMS2_URL /
 RUN \
-  tar $TAR_OPTS $LCMS2_FILE && \
   cd lcms2-* && \
   ./autogen.sh && \
   ./configure \
@@ -626,8 +603,8 @@ ARG LIBMYSOFA_VERSION=1.3.5
 ARG LIBMYSOFA_URL="https://github.com/hoene/libmysofa/archive/refs/tags/v$LIBMYSOFA_VERSION.tar.gz"
 ARG LIBMYSOFA_FILE="libmysofa.$LIBMYSOFA_VERSION.tar.gz"
 ARG LIBMYSOFA_SHA256=f29508c335c83d8703f943ffc9ca783ac39aca84e851357f13a55af0f8143137
+ADD --checksum=sha256:$LIBMYSOFA_SHA256 --unpack=true $LIBMYSOFA_URL /
 RUN \
-  tar $TAR_OPTS $LIBMYSOFA_FILE && \
   cd libmysofa-*/build && \
   cmake \
     -G"Unix Makefiles" \
@@ -647,8 +624,8 @@ ARG OPENAPV_VERSION=0.3.0.0
 ARG OPENAPV_URL="https://github.com/AcademySoftwareFoundation/openapv/archive/refs/tags/v$OPENAPV_VERSION.tar.gz"
 ARG OPENAPV_FILE="openapv.$OPENAPV_VERSION.tar.gz"
 ARG OPENAPV_SHA256=dc5cd1618a07e8b340e12562cae37d612b3a1467ee80d986c477165ae602a37e
+ADD --checksum=sha256:$OPENAPV_SHA256 --unpack=true $OPENAPV_URL /
 RUN \
-  tar $TAR_OPTS $OPENAPV_FILE --exclude='*/test' && \
   cd openapv-* && \
   cmake -B build \
     -DOAPV_BUILD_APPS=OFF \
@@ -663,8 +640,8 @@ ARG OPENCOREAMR_VERSION=0.1.6
 ARG OPENCOREAMR_URL="https://downloads.sourceforge.net/project/opencore-amr/opencore-amr/opencore-amr-$OPENCOREAMR_VERSION.tar.gz"
 ARG OPENCOREAMR_FILE="opencoreamr.$OPENCOREAMR_VERSION.tar.gz"
 ARG OPENCOREAMR_SHA256=483eb4061088e2b34b358e47540b5d495a96cd468e361050fae615b1809dc4a1
+ADD --checksum=sha256:$OPENCOREAMR_SHA256 --unpack=true $OPENCOREAMR_URL /
 RUN \
-  tar $TAR_OPTS $OPENCOREAMR_FILE && \
   cd opencore-amr-* && \
   ./configure \
     --disable-dependency-tracking \
@@ -679,8 +656,8 @@ ARG OPENJPEG_VERSION=2.5.4
 ARG OPENJPEG_URL="https://github.com/uclouvain/openjpeg/archive/v$OPENJPEG_VERSION.tar.gz"
 ARG OPENJPEG_FILE="openjpeg.$OPENJPEG_VERSION.tar.gz"
 ARG OPENJPEG_SHA256=a695fbe19c0165f295a8531b1e4e855cd94d0875d2f88ec4b61080677e27188a
+ADD --checksum=sha256:$OPENJPEG_SHA256 --unpack=true $OPENJPEG_URL /
 RUN \
-  tar $TAR_OPTS $OPENJPEG_FILE && \
   cd openjpeg-* && \
   mkdir build && \
   cd build && \
@@ -703,8 +680,8 @@ ARG OPUS_VERSION=1.6.1
 ARG OPUS_URL="https://downloads.xiph.org/releases/opus/opus-$OPUS_VERSION.tar.gz"
 ARG OPUS_FILE="opus.$OPUS_VERSION.tar.gz"
 ARG OPUS_SHA256=6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1
+ADD --checksum=sha256:$OPUS_SHA256 --unpack=true $OPUS_URL /
 RUN \
-  tar $TAR_OPTS $OPUS_FILE && \
   cd opus-* && \
   ./configure \
     --disable-dependency-tracking \
@@ -721,8 +698,8 @@ ARG LIBRABBITMQ_VERSION=0.18.1
 ARG LIBRABBITMQ_URL="https://github.com/alanxz/rabbitmq-c/archive/refs/tags/v$LIBRABBITMQ_VERSION.tar.gz"
 ARG LIBRABBITMQ_FILE="librabbitmq.$LIBRABBITMQ_VERSION.tar.gz"
 ARG LIBRABBITMQ_SHA256=0779bd4f00175ff2f722f9dc43b542bea3bc606ed079e7099fa8a18627c2ddc9
+ADD --checksum=sha256:$LIBRABBITMQ_SHA256 --unpack=true $LIBRABBITMQ_URL /
 RUN \
-  tar $TAR_OPTS $LIBRABBITMQ_FILE && \
   cd rabbitmq-c-* && \
   mkdir build && \
   cd build && \
@@ -750,8 +727,8 @@ ARG RAV1E_VERSION=0.8.1
 ARG RAV1E_URL="https://github.com/xiph/rav1e/archive/v$RAV1E_VERSION.tar.gz"
 ARG RAV1E_FILE="rav1e.$RAV1E_VERSION.tar.gz"
 ARG RAV1E_SHA256=06d1523955fb6ed9cf9992eace772121067cca7e8926988a1ee16492febbe01e
+ADD --checksum=sha256:$RAV1E_SHA256 --unpack=true $RAV1E_URL /
 RUN --mount=type=cache,target=/root/.cargo/registry --mount=type=cache,target=/root/.cargo/git \
-  tar $TAR_OPTS $RAV1E_FILE && \
   cd rav1e-* && \
   RUSTFLAGS="-C target-feature=+crt-static" \
   CARGO_PROFILE_RELEASE_LTO=false \
@@ -767,6 +744,7 @@ RUN --mount=type=cache,target=/root/.cargo/registry --mount=type=cache,target=/r
 ARG LIBRTMP_URL="git://git.ffmpeg.org/rtmpdump.git"
 ARG LIBRTMP_COMMIT=138fdb258d9fc26f1843fd1b891180416c9dc575
 ARG LIBRTMP_DIR="rtmpdump-$LIBRTMP_COMMIT"
+ADD --checksum=$LIBRTMP_COMMIT $LIBRTMP_URL#$LIBRTMP_COMMIT /$LIBRTMP_DIR
 RUN \
   cd $LIBRTMP_DIR && \
   make -C librtmp SYS=posix SHARED=off XCFLAGS="$CFLAGS" OPT= -j$(nproc) install
@@ -779,8 +757,8 @@ ARG RUBBERBAND_VERSION=4.0.0
 ARG RUBBERBAND_URL="https://breakfastquay.com/files/releases/rubberband-$RUBBERBAND_VERSION.tar.bz2"
 ARG RUBBERBAND_FILE="rubberband.$RUBBERBAND_VERSION.tar.bz2"
 ARG RUBBERBAND_SHA256=af050313ee63bc18b35b2e064e5dce05b276aaf6d1aa2b8a82ced1fe2f8028e9
+ADD --checksum=sha256:$RUBBERBAND_SHA256 --unpack=true $RUBBERBAND_URL /
 RUN \
-  tar $TAR_OPTS $RUBBERBAND_FILE && \
   cd rubberband-* && \
   meson setup build \
     -Ddefault_library=static \
@@ -796,9 +774,9 @@ ARG LIBSHINE_VERSION=3.1.1
 ARG LIBSHINE_URL="https://github.com/toots/shine/releases/download/$LIBSHINE_VERSION/shine-$LIBSHINE_VERSION.tar.gz"
 ARG LIBSHINE_FILE="libshine.$LIBSHINE_VERSION.tar.gz"
 ARG LIBSHINE_SHA256=58e61e70128cf73f88635db495bfc17f0dde3ce9c9ac070d505a0cd75b93d384
+ADD --checksum=sha256:$LIBSHINE_SHA256 --unpack=true $LIBSHINE_URL /
 RUN \
   # https://github.com/toots/shine/commit/098b9aaa6770a41bdf3f9c049307c1398f04d2d3
-  tar $TAR_OPTS $LIBSHINE_FILE && \
   cd shine-* && \
   sed -i 's/shine_mdct_initialise()/shine_mdct_initialise(shine_global_config *config)/' src/lib/l3mdct.h && \
   sed -i '/^CFLAGS = /s/ -O2//' Makefile.in && \
@@ -818,8 +796,8 @@ ARG SPEEX_VERSION=1.2.1
 ARG SPEEX_URL="https://github.com/xiph/speex/archive/Speex-$SPEEX_VERSION.tar.gz"
 ARG SPEEX_FILE="speex.$SPEEX_VERSION.tar.gz"
 ARG SPEEX_SHA256=beaf2642e81a822eaade4d9ebf92e1678f301abfc74a29159c4e721ee70fdce0
+ADD --checksum=sha256:$SPEEX_SHA256 --unpack=true $SPEEX_URL /
 RUN \
-  tar $TAR_OPTS $SPEEX_FILE && \
   cd speex-Speex-* && \
   ./autogen.sh && \
   ./configure \
@@ -835,8 +813,8 @@ ARG SRT_VERSION=1.5.7
 ARG SRT_URL="https://github.com/Haivision/srt/archive/v$SRT_VERSION.tar.gz"
 ARG SRT_FILE="srt.$SRT_VERSION.tar.gz"
 ARG SRT_SHA256=017cd1e437ef2073a4dd10ddf7b55e86bc3d6ebac0393d13bd22f6a57055d32b
+ADD --checksum=sha256:$SRT_SHA256 --unpack=true $SRT_URL /
 RUN \
-  tar $TAR_OPTS $SRT_FILE && \
   cd srt-* && \
   mkdir build && \
   cd build && \
@@ -865,8 +843,8 @@ ARG LIBSSH_URL="https://gitlab.com/libssh/libssh-mirror/-/archive/libssh-$LIBSSH
 ARG LIBSSH_FILE="libssh.$LIBSSH_VERSION.tar.bz2"
 ARG LIBSSH_SHA256=dc41a518492de4797db0ba226f94c8552c5c8fddd764fd98b58043f757adf3de
 # LIBSSH_STATIC=1 is REQUIRED to link statically against libssh.a so add to pkg-config file
+ADD --checksum=sha256:$LIBSSH_SHA256 --unpack=true $LIBSSH_URL /
 RUN \
-  tar $TAR_OPTS $LIBSSH_FILE && \
   cd libssh-* && \
   mkdir build && \
   cd build && \
@@ -901,8 +879,8 @@ ARG SVTAV1_VERSION=4.2.0
 ARG SVTAV1_URL="https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v$SVTAV1_VERSION/SVT-AV1-v$SVTAV1_VERSION.tar.bz2"
 ARG SVTAV1_FILE="svtav1.$SVTAV1_VERSION.tar.bz2"
 ARG SVTAV1_SHA256=512f2ea5649e3e76c2dddcc25c2556fb67a9582baaab207c9c96161c94659dad
+ADD --checksum=sha256:$SVTAV1_SHA256 --unpack=true $SVTAV1_URL /
 RUN \
-  tar $TAR_OPTS $SVTAV1_FILE && \
   cd SVT-AV1-*/Build && \
   cmake \
     -G"Unix Makefiles" \
@@ -925,8 +903,8 @@ ARG OGG_VERSION=1.3.6
 ARG OGG_URL="https://downloads.xiph.org/releases/ogg/libogg-$OGG_VERSION.tar.xz"
 ARG OGG_FILE="ogg.$OGG_VERSION.tar.xz"
 ARG OGG_SHA256=5c8253428e181840cd20d41f3ca16557a9cc04bad4a3d04cce84808677fa1061
+ADD --checksum=sha256:$OGG_SHA256 --unpack=true $OGG_URL /
 RUN \
-  tar $TAR_OPTS $OGG_FILE && \
   cd libogg-* && \
   ./configure \
     --disable-dependency-tracking \
@@ -942,8 +920,8 @@ ARG THEORA_VERSION=1.2.0
 ARG THEORA_URL="https://downloads.xiph.org/releases/theora/libtheora-$THEORA_VERSION.tar.gz"
 ARG THEORA_FILE="theora.$THEORA_VERSION.tar.gz"
 ARG THEORA_SHA256=279327339903b544c28a92aeada7d0dcfd0397b59c2f368cc698ac56f515906e
+ADD --checksum=sha256:$THEORA_SHA256 --unpack=true $THEORA_URL /
 RUN \
-  tar $TAR_OPTS $THEORA_FILE && \
   cd libtheora-* && \
   # --build=$(arch)-unknown-linux-gnu helps with guessing the correct build. For some reason,
   # build script can't guess the build type in arm64 (hardware and emulated) environment.
@@ -963,8 +941,8 @@ ARG TWOLAME_VERSION=0.4.0
 ARG TWOLAME_URL="https://github.com/njh/twolame/releases/download/$TWOLAME_VERSION/twolame-$TWOLAME_VERSION.tar.gz"
 ARG TWOLAME_FILE="twolame.$TWOLAME_VERSION.tar.gz"
 ARG TWOLAME_SHA256=cc35424f6019a88c6f52570b63e1baf50f62963a3eac52a03a800bb070d7c87d
+ADD --checksum=sha256:$TWOLAME_SHA256 --unpack=true $TWOLAME_URL /
 RUN \
-  tar $TAR_OPTS $TWOLAME_FILE && \
   cd twolame-* && \
   ./configure \
     --disable-dependency-tracking \
@@ -982,8 +960,8 @@ ARG UAVS3D_URL="https://github.com/uavs3/uavs3d/archive/refs/tags/$UAVS3D_VERSIO
 ARG UAVS3D_FILE="uavs3d.$UAVS3D_VERSION.tar.gz"
 ARG UAVS3D_SHA256=faa1f1f82badc0603d9944bb5af7b961dd42236e2c3a7aa8fcfc080bbeb5b157
 # the 8 bit build rejects 10 bit streams
+ADD --checksum=sha256:$UAVS3D_SHA256 --unpack=true $UAVS3D_URL /
 RUN \
-  tar $TAR_OPTS $UAVS3D_FILE && \
   cd uavs3d-* && \
   mkdir build/linux && \
   cd build/linux && \
@@ -1005,8 +983,8 @@ ARG VIDSTAB_VERSION=1.1.2
 ARG VIDSTAB_URL="https://github.com/georgmartius/vid.stab/archive/v$VIDSTAB_VERSION.tar.gz"
 ARG VIDSTAB_FILE="vidstab.$VIDSTAB_VERSION.tar.gz"
 ARG VIDSTAB_SHA256=96db34d48a9e3aa13736a48744b56dfb76731ac9bb5193c716de8534c9fd709d
+ADD --checksum=sha256:$VIDSTAB_SHA256 --unpack=true $VIDSTAB_URL /
 RUN \
-  tar $TAR_OPTS $VIDSTAB_FILE && \
   cd vid.stab-* && \
   mkdir build && \
   cd build && \
@@ -1032,8 +1010,8 @@ ARG VORBIS_VERSION=1.3.7
 ARG VORBIS_URL="https://downloads.xiph.org/releases/vorbis/libvorbis-$VORBIS_VERSION.tar.xz"
 ARG VORBIS_FILE="vorbis.$VORBIS_VERSION.tar.xz"
 ARG VORBIS_SHA256=b33cc4934322bcbf6efcbacf49e3ca01aadbea4114ec9589d1b1e9d20f72954b
+ADD --checksum=sha256:$VORBIS_SHA256 --unpack=true $VORBIS_URL /
 RUN \
-  tar $TAR_OPTS $VORBIS_FILE && \
   cd libvorbis-* && \
   ./configure \
     --disable-dependency-tracking \
@@ -1050,8 +1028,8 @@ ARG LIBOPENMPT_VERSION=0.8.9
 ARG LIBOPENMPT_URL="https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-$LIBOPENMPT_VERSION+release.makefile.tar.gz"
 ARG LIBOPENMPT_FILE="libopenmpt.$LIBOPENMPT_VERSION.tar.gz"
 ARG LIBOPENMPT_SHA256=9273b88b67973cc69e54d748ab1b749399d6d07695f1c37d0c59f88b4106074f
+ADD --checksum=sha256:$LIBOPENMPT_SHA256 --unpack=true $LIBOPENMPT_URL /
 RUN \
-  tar $TAR_OPTS $LIBOPENMPT_FILE && \
   cd libopenmpt-* && \
   make -j$(nproc) \
     PREFIX=/usr/local \
@@ -1073,8 +1051,8 @@ ARG VPX_VERSION=1.17.0
 ARG VPX_URL="https://github.com/webmproject/libvpx/archive/v$VPX_VERSION.tar.gz"
 ARG VPX_FILE="vpx.$VPX_VERSION.tar.gz"
 ARG VPX_SHA256=1020f184046187baa2985dbde38e0691f49c44088bca7a1842b0236c6081dc0a
+ADD --checksum=sha256:$VPX_SHA256 --unpack=true $VPX_URL /
 RUN \
-  tar $TAR_OPTS $VPX_FILE && \
   cd libvpx-* && \
   ./configure \
     --disable-dependency-tracking \
@@ -1094,8 +1072,8 @@ ARG LIBWEBP_VERSION=1.6.0
 ARG LIBWEBP_URL="https://github.com/webmproject/libwebp/archive/v$LIBWEBP_VERSION.tar.gz"
 ARG LIBWEBP_FILE="libwebp.$LIBWEBP_VERSION.tar.gz"
 ARG LIBWEBP_SHA256=93a852c2b3efafee3723efd4636de855b46f9fe1efddd607e1f42f60fc8f2136
+ADD --checksum=sha256:$LIBWEBP_SHA256 --unpack=true $LIBWEBP_URL /
 RUN \
-  tar $TAR_OPTS $LIBWEBP_FILE && \
   cd libwebp-* && \
   ./autogen.sh && \
   ./configure \
@@ -1122,8 +1100,10 @@ RUN \
 ARG X264_URL="https://code.videolan.org/videolan/x264.git"
 ARG X264_COMMIT=b35605ace3ddf7c1a5d67a2eb553f034aef41d55
 ARG X264_DIR="x264-$X264_COMMIT"
+ADD --keep-git-dir=true --checksum=$X264_COMMIT $X264_URL#$X264_COMMIT /$X264_DIR
 RUN \
   cd $X264_DIR && \
+  git fetch --unshallow --filter=tree:0 origin +refs/heads/master:refs/remotes/origin/master && \
   ./configure \
     --enable-pic \
     --enable-static \
@@ -1139,8 +1119,8 @@ ARG X265_URL="https://github.com/Multicorewareinc/x265/releases/download/$X265_V
 ARG X265_FILE="x265.$X265_VERSION.tar.gz"
 # CMAKEFLAGS issue
 # https://bitbucket.org/multicoreware/x265_git/issues/620/support-passing-cmake-flags-to-multilibsh
+ADD --checksum=sha256:$X265_SHA256 --unpack=true $X265_URL /
 RUN \
-  tar $TAR_OPTS $X265_FILE && \
   cd x265_*/build/linux && \
   sed -i '/^cmake / s/$/ -G "Unix Makefiles" ${CMAKEFLAGS}/' ./multilib.sh && \
   sed -i 's/ -DENABLE_SHARED=OFF//g' ./multilib.sh && \
@@ -1160,8 +1140,8 @@ ARG XAVS2_VERSION=1.4
 ARG XAVS2_URL="https://github.com/pkuvcl/xavs2/archive/refs/tags/$XAVS2_VERSION.tar.gz"
 ARG XAVS2_FILE="xavs2.$XAVS2_VERSION.tar.gz"
 ARG XAVS2_SHA256=1e6d731cd64cb2a8940a0a3fd24f9c2ac3bb39357d802432a47bc20bad52c6ce
+ADD --checksum=sha256:$XAVS2_SHA256 --unpack=true $XAVS2_URL /
 RUN \
-  tar $TAR_OPTS $XAVS2_FILE && \
   cd xavs2-*/build/linux && \
   # new gcc not happy with some of the code
   CFLAGS="$CFLAGS -Wno-incompatible-pointer-types -Wno-unused-function" \
@@ -1180,8 +1160,8 @@ ARG XVID_VERSION=1.3.7
 ARG XVID_URL="https://downloads.xvid.com/downloads/xvidcore-$XVID_VERSION.tar.bz2"
 ARG XVID_FILE="xvid.$XVID_VERSION.tar.bz2"
 ARG XVID_SHA256=aeeaae952d4db395249839a3bd03841d6844843f5a4f84c271ff88f7aa1acff7
+ADD --checksum=sha256:$XVID_SHA256 --unpack=true $XVID_URL /
 RUN \
-  tar $TAR_OPTS $XVID_FILE && \
   cd xvidcore/build/generic && \
   # gnu18 to fix issue type own bool typedef
   CFLAGS="$CFLAGS -std=gnu18 -fstrength-reduce -ffast-math" ./configure && \
@@ -1198,8 +1178,8 @@ ARG XEVE_VERSION=0.7.1
 ARG XEVE_URL="https://github.com/mpeg5/xeve/archive/refs/tags/v$XEVE_VERSION.tar.gz"
 ARG XEVE_FILE="xeve.$XEVE_VERSION.tar.gz"
 ARG XEVE_SHA256=5d1249212f431816b4723937c9ec8491b45ee1bb75c0f46692deaf7f59fbf19c
+ADD --checksum=sha256:$XEVE_SHA256 --unpack=true $XEVE_URL /
 RUN \
-  tar $TAR_OPTS $XEVE_FILE && \
   cd xeve-* && \
   echo v$XEVE_VERSION > version.txt && \
   sed -i 's/mc_filter_bilin/xevem_mc_filter_bilin/' src_main/sse/xevem_mc_sse.c && \
@@ -1224,8 +1204,8 @@ ARG XEVD_VERSION=0.8.0
 ARG XEVD_URL="https://github.com/mpeg5/xevd/archive/refs/tags/v$XEVD_VERSION.tar.gz"
 ARG XEVD_FILE="xevd.$XEVD_VERSION.tar.gz"
 ARG XEVD_SHA256=258d626fbb6c7ea1677b4fb0ffed3eaca2ec312810d6a76f67359fdc16068472
+ADD --checksum=sha256:$XEVD_SHA256 --unpack=true $XEVD_URL /
 RUN \
-  tar $TAR_OPTS $XEVD_FILE && \
   cd xevd-* && \
   echo v$XEVD_VERSION > version.txt && \
   mkdir build && \
@@ -1248,8 +1228,8 @@ ARG ZIMG_VERSION=3.0.6
 ARG ZIMG_URL="https://github.com/sekrit-twc/zimg/archive/release-$ZIMG_VERSION.tar.gz"
 ARG ZIMG_FILE="zimg.$ZIMG_VERSION.tar.gz"
 ARG ZIMG_SHA256=be89390f13a5c9b2388ce0f44a5e89364a20c1c57ce46d382b1fcc3967057577
+ADD --checksum=sha256:$ZIMG_SHA256 --unpack=true $ZIMG_URL /
 RUN \
-  tar $TAR_OPTS $ZIMG_FILE && \
   cd zimg-* && \
   ./autogen.sh && \
   ./configure \
@@ -1266,8 +1246,8 @@ ARG HIGHWAY_VERSION=1.4.0
 ARG HIGHWAY_URL="https://github.com/google/highway/releases/download/$HIGHWAY_VERSION/highway-$HIGHWAY_VERSION.tar.gz"
 ARG HIGHWAY_FILE="highway.$HIGHWAY_VERSION.tar.gz"
 ARG HIGHWAY_SHA256=36f672ab48ddb3c8555e9e89e16fe400cd7d16c6eb455a1a3d0c146a63ababdc
+ADD --checksum=sha256:$HIGHWAY_SHA256 --unpack=true $HIGHWAY_URL /
 RUN \
-  tar $TAR_OPTS $HIGHWAY_FILE && \
   cd highway-* && \
   cmake -B build \
     -G"Unix Makefiles" \
@@ -1293,8 +1273,8 @@ ARG LIBJXL_VERSION=0.12.0
 ARG LIBJXL_URL="https://github.com/libjxl/libjxl/archive/refs/tags/v${LIBJXL_VERSION}.tar.gz"
 ARG LIBJXL_FILE="libjxl.$LIBJXL_VERSION.tar.gz"
 ARG LIBJXL_SHA256=03e9be69a30be4011f559da75328b6d7cea8ad921fabfbd551ce10bf45cdc992
+ADD --checksum=sha256:$LIBJXL_SHA256 --unpack=true $LIBJXL_URL /
 RUN \
-  tar $TAR_OPTS $LIBJXL_FILE && \
   cd libjxl-* && \
   cmake -B build \
     -G"Unix Makefiles" \
@@ -1332,8 +1312,8 @@ ARG LIBZMQ_VERSION=4.3.5
 ARG LIBZMQ_URL="https://github.com/zeromq/libzmq/releases/download/v${LIBZMQ_VERSION}/zeromq-${LIBZMQ_VERSION}.tar.gz"
 ARG LIBZMQ_FILE="libzmq.$LIBZMQ_VERSION.tar.gz"
 ARG LIBZMQ_SHA256=6653ef5910f17954861fe72332e68b03ca6e4d9c7160eb3a8de5a5a913bfab43
+ADD --checksum=sha256:$LIBZMQ_SHA256 --unpack=true $LIBZMQ_URL /
 RUN \
-  tar $TAR_OPTS $LIBZMQ_FILE && \
   cd zeromq-* && \
   # fix sha1_init symbol collision with libssh
   grep -r -l sha1_init external/sha1* | xargs sed -i 's/sha1_init/zeromq_sha1_init/g' && \
@@ -1370,8 +1350,8 @@ ARG VVENC_VERSION=1.14.0
 ARG VVENC_URL="https://github.com/fraunhoferhhi/vvenc/archive/refs/tags/v$VVENC_VERSION.tar.gz"
 ARG VVENC_FILE="vvenc.$VVENC_VERSION.tar.gz"
 ARG VVENC_SHA256=dd43d061d59dbc0d9b9ae5b99cb40672877dd811646228938f065798939ee174
+ADD --checksum=sha256:$VVENC_SHA256 --unpack=true $VVENC_URL /
 RUN \
-  tar $TAR_OPTS $VVENC_FILE && \
   cd vvenc-* && \
   sed -i 's/-Werror;//' source/Lib/vvenc/CMakeLists.txt && \
   cmake \
@@ -1398,8 +1378,8 @@ ARG FFMPEG_SHA256=8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e00
 # ldflags stack-size=2097152 is to increase default stack size from 128KB (musl default) to something
 # more similar to glibc (2MB). This fixing segfault with libaom-av1 and libsvtav1 as they seems to pass
 # large things on the stack.
+ADD --checksum=sha256:$FFMPEG_SHA256 --unpack=true $FFMPEG_URL /
 RUN \
-  tar $TAR_OPTS $FFMPEG_FILE && \
   cd ffmpeg-* && \
   FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-nonfree " ;else echo ""; fi) && \
   sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
