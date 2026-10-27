@@ -27,9 +27,8 @@ A conflict resolved at link time (e.g. two libraries defining the same symbol) i
 3. **One stage per library.** `FROM base AS <lib>` (or `FROM <parent>` for chains), containing the library's original download and build commands unchanged. Libraries linked by a hard dependency stay together in one stage, in their original order. Stage names: lowercase, `[a-z0-9-_.]`. Builds that fetch during compile (find them by the fetching tool in the recipe) keep a `RUN --mount=type=cache` on that tool's download cache (e.g. cargo's `registry` and `git` directories) so nothing is re-downloaded — a flag only, no extra stage.
 4. **Every stage passes on what later stages read.** Libraries install into the prefix the original uses so `.pc` prefixes stay valid after the merge; check non-standard installs (custom install tools, manual `cp`, symlinks).
 5. **Final build stage.** `FROM base AS <its original name>`, then one `COPY --link --from=<leaf>` per leaf build stage for what that stage reads, then download and build the final program as in the original; chain members arrive through the last stage of their chain. The COPYs must precede the final build so its configure step finds the libraries. `--link` is safe here because the merges are additive and duplicate files from chains are identical.
-6. **Steps that read version variables** (e.g. a generated version manifest): each library stage writes the values it holds into a file under the copied prefix, and the step builds its output from those files instead of reading the `ARG`s.
-7. **Keep unchanged:** everything outside the library builds — what the final stages install, copy and test — and the name of the stage the final stages copy from.
-8. **Comment the non-obvious:** which hard dependency keeps libraries in one stage, which chain links are kept only for identical output, and why each stage has its parent.
+6. **Keep unchanged:** everything outside the library builds — what the final stages install, copy and test — and the name of the stage the final stages copy from.
+7. **Comment the non-obvious:** which hard dependency keeps libraries in one stage, which chain links are kept only for identical output, and why each stage has its parent.
 
 ## Step 3: serial helper scripts
 
@@ -63,6 +62,7 @@ Report what could not be verified (the real build) in one line.
 
 - **Hidden hard dependencies.** Check every "independent" assumption against the build scripts, not the flag names (e.g. a dependency script that does not vendor a library the build then fails to find).
 - **Only what is copied crosses stages.** Anything in the final build stage that reads a source dir works only because that stage builds the program there.
+- **Values that later steps collect.** In a serial source, a step that reads the values of many recipes (e.g. a version manifest) shares one stage with all of them; after the split, moving those `ARG`s before the first `FROM` tears every recipe's `ARG`s apart from the recipe. Keep each value with its recipe and let it reach the later step through what its stage passes on.
 - **Glob collisions.** Patterns like `cd <name>*` match both the tarball and the directory. This works in the source file; do not change these patterns.
 - **Oversubscription.** N parallel stages × `-j$(nproc)` each; cap it with BuildKit's max-parallelism if needed. Do not change `-j` values.
 - **Cheap syntax tests mislead.** Compiling configure-based C projects without their generated headers produces fatal errors that hide real ones. Only claim results for files that actually compiled.
