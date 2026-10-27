@@ -22,14 +22,14 @@ A conflict resolved at link time (e.g. two libraries defining the same symbol) i
 
 ## Step 2: one stage per library
 
-1. **Global ARG block.** Every `ARG` that more than one stage reads, or that a stage reads before its first `FROM` would set it, moves before the first `FROM` together with its bump comments, and is re-declared in each stage that uses it. Derive the set from the file: every `$VAR` a stage reads that no instruction of that stage sets.
+1. **ARGs stay in the stages.** Every `ARG` stays, with its bump comments, in the stage that builds what it belongs to. Only an `ARG` that a `FROM` reads or that more than one stage reads moves before the first `FROM`, and each stage that reads it re-declares it.
 2. **base stage.** `FROM <base image> AS base`, the unchanged package install list, then import the flags and download settings and set them as `ENV`.
-3. **One stage per library.** `FROM base AS <lib>` (or `FROM <parent>` for chains), containing the library's original download and build commands unchanged. Import the ARGs the stage uses. Stage names: lowercase, `[a-z0-9-_.]`. Builds that fetch during compile (find them by the fetching tool in the recipe) keep a `RUN --mount=type=cache` on that tool's download cache (e.g. cargo's `registry` and `git` directories) so nothing is re-downloaded — a flag only, no extra stage.
+3. **One stage per library.** `FROM base AS <lib>` (or `FROM <parent>` for chains), containing the library's original download and build commands unchanged. Libraries linked by a hard dependency stay together in one stage, in their original order. Stage names: lowercase, `[a-z0-9-_.]`. Builds that fetch during compile (find them by the fetching tool in the recipe) keep a `RUN --mount=type=cache` on that tool's download cache (e.g. cargo's `registry` and `git` directories) so nothing is re-downloaded — a flag only, no extra stage.
 4. **Every stage passes on what later stages read.** Libraries install into the prefix the original uses so `.pc` prefixes stay valid after the merge; check non-standard installs (custom install tools, manual `cp`, symlinks).
 5. **Final build stage.** `FROM base AS <its original name>`, then one `COPY --link --from=<leaf>` per leaf build stage for what that stage reads, then download and build the final program as in the original; chain members arrive through the last stage of their chain. The COPYs must precede the final build so its configure step finds the libraries. `--link` is safe here because the merges are additive and duplicate files from chains are identical.
-6. **Steps that read version variables** (e.g. a generated version manifest): re-declare every `ARG` they read; a missing one silently becomes empty.
+6. **Steps that read version variables** (e.g. a generated version manifest): each library stage writes the values it holds into a file under the copied prefix, and the step builds its output from those files instead of reading the `ARG`s.
 7. **Keep unchanged:** everything outside the library builds — what the final stages install, copy and test — and the name of the stage the final stages copy from.
-8. **Comment the non-obvious:** which chain links are hard and which are kept only for identical output, and why each stage has its parent.
+8. **Comment the non-obvious:** which hard dependency keeps libraries in one stage, which chain links are kept only for identical output, and why each stage has its parent.
 
 ## Step 3: serial helper scripts
 
@@ -38,6 +38,16 @@ A recipe can hide several independent builds behind one script that runs them in
 - Guard the script lines the stages replay (`grep -qxF` on the unmodified lines), so the build fails loudly when upstream changes the script; then re-derive the stages from it.
 - The last stage keeps the name later stages copy from.
 - Do not patch the script.
+
+## Layer economy
+
+BuildKit reuses a layer as long as nothing before it in its stage and nothing it reads has changed; a change invalidates every later instruction of that stage and every stage built on it.
+
+Question for every placement decision (what goes into which stage, which stage inherits from which): when one input changes (a version bump, a patch, a flag), which already built work has to run again, and is any shared prerequisite built more than once?
+
+- Evidence: for each option, list per input the RUN lines a change of it re-runs, read from the file; choose the option that re-runs least without splitting a hard dependency.
+- Shared prerequisites (a toolchain, a package install several stages read) are built once in their own stage and inherited, never repeated per stage.
+- Not being named here is no reason to leave a placement unchecked.
 
 ## Step 4: verification without Docker
 
