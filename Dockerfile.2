@@ -119,10 +119,8 @@ RUN \
     -DCONFIG_LIBYUV=0 \
     -DENABLE_NASM=ON \
     -DCMAKE_INSTALL_LIBDIR=lib \
-    -DCMAKE_SKIP_INSTALL_ALL_DEPENDENCY=ON \
     .. && \
-  make -j$(nproc) aom aom_pc && \
-  make install && \
+  make -j$(nproc) install && \
   echo "$AOM_VERSION" > /usr/local/share/versions/libaom
 
 FROM base AS libaribb24
@@ -229,8 +227,7 @@ RUN \
     -Dxcb=disabled \
     -Dxlib=disabled \
     -Dxlib-xcb=disabled && \
-  ninja -j$(nproc) -vC build $(jq -r --arg b "$PWD/build/" '.targets | to_entries[] | select(.value.tag == "devel" or .value.tag == "bin-devel") | .key | ltrimstr($b)' build/meson-info/intro-install_plan.json) && \
-  meson install -C build --no-rebuild --tags devel,bin-devel
+  ninja -j$(nproc) -vC build install
 
 # TODO: there is weird "1.90" tag, skip it
 # bump: pango /PANGO_VERSION=([\d.]+)/ https://github.com/GNOME/pango.git|/\d+\.\d+\.\d+/|*
@@ -250,8 +247,7 @@ RUN \
     -Dbuild-testsuite=false \
     -Dbuild-examples=false \
     -Dgtk_doc=false && \
-  ninja -j$(nproc) -vC build $(jq -r --arg b "$PWD/build/" '.targets | to_entries[] | select(.value.tag == "devel" or .value.tag == "bin-devel") | .key | ltrimstr($b)' build/meson-info/intro-install_plan.json) && \
-  meson install -C build --no-rebuild --tags devel,bin-devel
+  ninja -j$(nproc) -vC build install
 
 # bump: dav1d /DAV1D_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/dav1d/last/|/dav1d-([\d.]+)\.tar\.xz/
 # bump: dav1d after ./hashupdate Dockerfile DAV1D $LATEST
@@ -473,7 +469,7 @@ RUN \
     --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) bin_PROGRAMS= install && \
+  make -j$(nproc) install && \
   echo "$KVAZAAR_VERSION" > /usr/local/share/versions/libkvazaar
 
 FROM base AS libmodplug
@@ -505,8 +501,6 @@ ARG MP3LAME_SHA256=3df5124d5ad3a98312ffd7ba6a9b36230e4f8a3e66d3ce0f425e336c32d21
 ADD --checksum=sha256:$MP3LAME_SHA256 --unpack=true $MP3LAME_URL /
 RUN \
   cd lame-* && \
-  # configure never sets NDEBUG, the encoder is full of asserts
-  CFLAGS="$CFLAGS -DNDEBUG" \
   ./configure \
     --disable-dependency-tracking \
     --disable-shared \
@@ -516,8 +510,7 @@ RUN \
     --disable-cpml \
     --disable-decoder \
     --disable-frontend && \
-  make -j$(nproc) -C libmp3lame install && \
-  make -C include install && \
+  make -j$(nproc) install && \
   echo "$MP3LAME_VERSION" > /usr/local/share/versions/libmp3lame
 
 FROM base AS libmysofa
@@ -668,7 +661,7 @@ ARG LIBRTMP_DIR="rtmpdump-$LIBRTMP_COMMIT"
 ADD --checksum=$LIBRTMP_COMMIT $LIBRTMP_URL#$LIBRTMP_COMMIT /$LIBRTMP_DIR
 RUN \
   cd $LIBRTMP_DIR && \
-  make -C librtmp SYS=posix SHARED=off XCFLAGS="$CFLAGS" OPT= -j$(nproc) install && \
+  make SYS=posix SHARED=off XCFLAGS="$CFLAGS" OPT= -j$(nproc) install && \
   echo "$LIBRTMP_COMMIT" > /usr/local/share/versions/librtmp
 
 FROM base AS rubberband
@@ -711,7 +704,7 @@ RUN \
     --enable-static \
     --disable-shared \
     --disable-fast-install && \
-  make -j$(nproc) bin_PROGRAMS= install && \
+  make -j$(nproc) install && \
   echo "$LIBSHINE_VERSION" > /usr/local/share/versions/libshine
 
 FROM base AS speex
@@ -845,7 +838,7 @@ RUN \
     --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) noinst_PROGRAMS= check_PROGRAMS= install && \
+  make -j$(nproc) install && \
   echo "$OGG_VERSION" > /usr/local/share/versions/libogg
 
 # bump: theora /THEORA_VERSION=([\d.]+)/ https://github.com/xiph/theora.git|*
@@ -887,7 +880,7 @@ RUN \
     --disable-shared \
     --enable-static \
     --disable-oggtest && \
-  make -j$(nproc) noinst_PROGRAMS= install && \
+  make -j$(nproc) install && \
   echo "$VORBIS_VERSION" > /usr/local/share/versions/libvorbis
 
 FROM base AS twolame
@@ -907,7 +900,7 @@ RUN \
     --enable-static \
     --disable-sndfile \
     --with-pic && \
-  make -j$(nproc) noinst_PROGRAMS= install && \
+  make -j$(nproc) install && \
   echo "$TWOLAME_VERSION" > /usr/local/share/versions/libtwolame
 
 FROM base AS uavs3d
@@ -930,10 +923,8 @@ RUN \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_SHARED_LIBS=OFF \
     -DCOMPILE_10BIT=1 \
-    -DCMAKE_SKIP_INSTALL_ALL_DEPENDENCY=ON \
     ../.. && \
-  make -j$(nproc) uavs3d && \
-  make install && \
+  make -j$(nproc) install && \
   echo "$UAVS3D_VERSION" > /usr/local/share/versions/libuavs3d
 
 FROM base AS vid.stab
@@ -1014,8 +1005,7 @@ RUN \
     --disable-jpeg \
     --disable-tiff \
     --disable-gif && \
-  make -j$(nproc) -C sharpyuv install && \
-  make -j$(nproc) -C src install && \
+  make -j$(nproc) install && \
   echo "$LIBWEBP_VERSION" > /usr/local/share/versions/libwebp
 
 FROM base AS x264
@@ -1097,10 +1087,7 @@ RUN \
   cd xvidcore/build/generic && \
   # gnu18 to fix issue type own bool typedef
   CFLAGS="$CFLAGS -std=gnu18 -fstrength-reduce -ffast-math" ./configure && \
-  # the install target needs the shared library, which nothing links
-  make -j$(nproc) libxvidcore.a && \
-  install -D -m644 ../../src/xvid.h /usr/local/include/xvid.h && \
-  install -D -m644 =build/libxvidcore.a /usr/local/lib/libxvidcore.a && \
+  make -j$(nproc) && make install && \
   echo "$XVID_VERSION" > /usr/local/share/versions/libxvid
 
 FROM base AS xeve
@@ -1124,11 +1111,7 @@ RUN \
     -DARM="$(if [ $(uname -m) == aarch64 ]; then echo TRUE; else echo FALSE; fi)" \
     -DCMAKE_BUILD_TYPE=Release \
     .. && \
-  # the install target needs the shared library and the app, which nothing links
-  make -j$(nproc) xeve && \
-  install -D -m644 src_main/libxeve.a /usr/local/lib/xeve/libxeve.a && \
-  install -D -m644 -t /usr/local/include/xeve ../inc/xeve.h xeve_exports.h && \
-  install -D -m644 xeve.pc /usr/local/lib/pkgconfig/xeve.pc && \
+  make -j$(nproc) install && \
   echo "$XEVE_VERSION" > /usr/local/share/versions/libxeve
 
 FROM base AS xevd
@@ -1151,11 +1134,7 @@ RUN \
     -DARM="$(if [ $(uname -m) == aarch64 ]; then echo TRUE; else echo FALSE; fi)" \
     -DCMAKE_BUILD_TYPE=Release \
     .. && \
-  # the install target needs the shared library and the app, which nothing links
-  make -j$(nproc) xevd && \
-  install -D -m644 src_main/libxevd.a /usr/local/lib/xevd/libxevd.a && \
-  install -D -m644 -t /usr/local/include/xevd ../inc/xevd.h xevd_exports.h && \
-  install -D -m644 xevd.pc /usr/local/lib/pkgconfig/xevd.pc && \
+  make -j$(nproc) install && \
   echo "$XEVD_VERSION" > /usr/local/share/versions/libxevd
 
 FROM base AS zimg
@@ -1196,7 +1175,7 @@ RUN \
     --without-jpeg \
     --without-tiff \
     --disable-shared && \
-  make -j$(nproc) SUBDIRS="src include" install && \
+  make -j$(nproc) install && \
   echo "$LCMS2_VERSION" > /usr/local/share/versions/lcms2
 
 # bump: highway /HIGHWAY_VERSION=([\d.]+)/ https://github.com/google/highway.git|^1
