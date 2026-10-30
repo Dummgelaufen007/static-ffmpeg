@@ -191,7 +191,7 @@ RUN \
     --localstatedir=/var \
     --disable-docs \
     --disable-nls && \
-  make -j$(nproc) SUBDIRS="fontconfig fc-case fc-lang fc-const fc-genericfamily src" && \
+  make V=1 -j$(nproc) SUBDIRS="fontconfig fc-case fc-lang fc-const fc-genericfamily src" && \
   make -C src install && \
   make -C fontconfig install && \
   make install-pkgconfigDATA
@@ -231,7 +231,7 @@ RUN \
     --with-legacy \
     --with-zlib \
     --without-python && \
-  make -j$(nproc) install
+  make V=1 -j$(nproc) install
 
 # bump: pcre2 /PCRE2_VERSION=([\d.]+)/ gitrefs:https://github.com/PCRE2Project/pcre2.git|re:#^refs/tags/pcre2-(\d+\.\d+)$#${1}#|*
 # bump: pcre2 after ./hashupdate Dockerfile PCRE2 $LATEST
@@ -248,7 +248,7 @@ RUN \
     --disable-shared \
     --enable-static \
     --enable-jit && \
-  make -j$(nproc) install
+  make V=1 -j$(nproc) install
 
 # bump: libffi /LIBFFI_VERSION=([\d.]+)/ https://github.com/libffi/libffi.git|^3
 # bump: libffi after ./hashupdate Dockerfile LIBFFI $LATEST
@@ -337,7 +337,7 @@ RUN \
     --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) libnuma.la && \
+  make V=1 -j$(nproc) libnuma.la && \
   make install-libLTLIBRARIES install-includeHEADERS install-pkgconfigDATA
 
 # double precision only, the one rubberband uses
@@ -374,7 +374,7 @@ RUN \
     --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) src/libsamplerate.la && \
+  make V=1 -j$(nproc) src/libsamplerate.la && \
   make install-libLTLIBRARIES install-includeHEADERS install-pkgconfigDATA
 
 # bump: soxr /SOXR_VERSION=([\d.]+)/ fetch:https://sourceforge.net/projects/soxr/files/|/soxr-([\d.]+)-Source\.tar\.xz/
@@ -410,7 +410,7 @@ RUN \
     --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) install
+  make V=1 -j$(nproc) install
 
 # bump: snappy /SNAPPY_VERSION=([\d.]+)/ https://github.com/google/snappy.git|^1
 # bump: snappy after ./hashupdate Dockerfile SNAPPY $LATEST
@@ -573,7 +573,7 @@ ARG LIBRSVG_SHA256=31f07d9350dad3f8964fd613c31309ac160fdef13dfac59df6fd082de78d6
 ADD --checksum=sha256:$LIBRSVG_SHA256 --unpack=true $LIBRSVG_URL /
 RUN --mount=type=cache,target=/root/.cargo/registry --mount=type=cache,target=/root/.cargo/git \
   cd librsvg-* && \
-  export CFLAGS="${CFLAGS% $LTO_FLAGS}" && \
+  export CFLAGS="${CFLAGS% $LTO_FLAGS}" CARGO_TERM_VERBOSE=true && \
   # workaround for https://gitlab.gnome.org/GNOME/librsvg/-/issues/1158
   sed -i "/^if host_system in \['windows'/s/, 'linux'//" meson.build && \
   meson setup build \
@@ -684,7 +684,7 @@ RUN \
     --enable-libunibreak \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) && make install
+  make V=1 -j$(nproc) && make install
 
 # bump: libudfread /LIBUDFREAD_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/libudfread/|/libudfread-([\d.]+)\.tar\.xz/|*
 # bump: libudfread after ./hashupdate Dockerfile LIBUDFREAD $LATEST
@@ -757,7 +757,7 @@ RUN \
     --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) install; \
+  make V=1 -j$(nproc) install; \
   fi
 
 # bump: libgme /LIBGME_VERSION=([\d.]+)/ https://github.com/libgme/game-music-emu.git|*
@@ -795,6 +795,7 @@ RUN \
   # no need to build toast cli tool \
   rm src/toast* && \
   SRC=$(echo src/*.c) && \
+  set -x && \
   gcc ${CFLAGS} -c -ansi -pedantic -s -DNeedFunctionPrototypes=1 -Wall -Wno-comment -DSASR -DWAV49 -DNDEBUG -I./inc ${SRC} && \
   ar cr libgsm.a *.o && ranlib libgsm.a && \
   mkdir -p /usr/local/include/gsm && \
@@ -816,7 +817,7 @@ RUN \
     --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) install
+  make V=1 -j$(nproc) install
 
 # bump: libmodplug /LIBMODPLUG_VERSION=([\d.]+)/ fetch:https://sourceforge.net/projects/modplug-xmms/files/|/libmodplug-([\d.]+).tar.gz/
 # bump: libmodplug after ./hashupdate Dockerfile LIBMODPLUG $LATEST
@@ -909,7 +910,7 @@ RUN \
     --disable-dependency-tracking \
     --enable-static \
     --disable-shared && \
-  make -j$(nproc) install
+  make V=1 -j$(nproc) install
 
 # bump: openjpeg /OPENJPEG_VERSION=([\d.]+)/ https://github.com/uclouvain/openjpeg.git|*
 # bump: openjpeg after ./hashupdate Dockerfile OPENJPEG $LATEST
@@ -951,7 +952,7 @@ RUN \
     --enable-static \
     --disable-extra-programs \
     --disable-doc && \
-  make -j$(nproc) install
+  make V=1 -j$(nproc) install
 
 # bump: librabbitmq /LIBRABBITMQ_VERSION=([\d.]+)/ https://github.com/alanxz/rabbitmq-c.git|*
 # bump: librabbitmq after ./hashupdate Dockerfile LIBRABBITMQ $LATEST
@@ -995,6 +996,7 @@ RUN --mount=type=cache,target=/root/.cargo/registry --mount=type=cache,target=/r
   RUSTFLAGS="-C target-feature=+crt-static" \
   CARGO_PROFILE_RELEASE_LTO=false \
   CARGO_PROFILE_RELEASE_DEBUG=false \
+  CARGO_TERM_VERBOSE=true \
   CFLAGS="${CFLAGS% $LTO_FLAGS}" \
   cargo cinstall --release --locked \
     --library-type staticlib \
@@ -1014,6 +1016,7 @@ RUN --mount=type=cache,target=/root/.cargo/registry --mount=type=cache,target=/r
   RUSTFLAGS="-C target-feature=+crt-static" \
   CARGO_PROFILE_RELEASE_LTO=thin \
   CARGO_PROFILE_RELEASE_DEBUG=false \
+  CARGO_TERM_VERBOSE=true \
   CFLAGS="${CFLAGS% $LTO_FLAGS}" \
   cargo build --release -p combo --target "$(rustc -vV | sed -n "s/^host: //p")" && \
   cp target/*/release/libcombo.a "$(pkg-config --variable=libdir rav1e)/librav1e.a" && \
@@ -1085,7 +1088,7 @@ RUN \
     --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) install
+  make V=1 -j$(nproc) install
 
 # bump: srt /SRT_VERSION=([\d.]+)/ https://github.com/Haivision/srt.git|^1
 # bump: srt after ./hashupdate Dockerfile SRT $LATEST
@@ -1212,7 +1215,7 @@ RUN \
    --disable-oggtest \
    --disable-shared \
    --enable-static && \
-  make -j$(nproc) install
+  make V=1 -j$(nproc) install
 
 # bump: twolame /TWOLAME_VERSION=([\d.]+)/ https://github.com/njh/twolame.git|*
 # bump: twolame after ./hashupdate Dockerfile TWOLAME $LATEST
@@ -1296,7 +1299,7 @@ RUN \
     --disable-shared \
     --enable-static \
     --disable-oggtest && \
-  make -j$(nproc) install
+  make V=1 -j$(nproc) install
 
 # bump: libvpx /VPX_VERSION=([\d.]+)/ https://github.com/webmproject/libvpx.git|*
 # bump: libvpx after ./hashupdate Dockerfile VPX $LATEST
@@ -1317,7 +1320,7 @@ RUN \
     --disable-unit-tests \
     --disable-tools \
     --disable-examples && \
-  make -j$(nproc) install
+  make V=1 -j$(nproc) install
 
 # bump: libwebp /LIBWEBP_VERSION=([\d.]+)/ https://github.com/webmproject/libwebp.git|^1
 # bump: libwebp after ./hashupdate Dockerfile LIBWEBP $LATEST
@@ -1345,7 +1348,7 @@ RUN \
     --disable-jpeg \
     --disable-tiff \
     --disable-gif && \
-  make -j$(nproc) install
+  make V=1 -j$(nproc) install
 
 # x264 only have a stable branch no tags and we checkout commit so no hash is needed
 # bump: x264 /X264_COMMIT=([[:xdigit:]]+)/ gitrefs:https://code.videolan.org/videolan/x264.git|re:#^refs/heads/stable$#|@commit
@@ -1420,6 +1423,7 @@ RUN \
   cd xvidcore/build/generic && \
   # gnu18 to fix issue type own bool typedef
   CFLAGS="$CFLAGS -std=gnu18 -fstrength-reduce -ffast-math" ./configure && \
+  sed -i 's/^\t@\$(CC) -c/\t$(CC) -c/' Makefile && \
   make -j$(nproc) && make install
 
 # bump: xeve /XEVE_VERSION=([\d.]+)/ https://github.com/mpeg5/xeve.git|*
@@ -1439,6 +1443,7 @@ RUN \
   cd build && \
   cmake \
     -G"Unix Makefiles" \
+    -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DARM="$(if [ $(uname -m) == aarch64 ]; then echo TRUE; else echo FALSE; fi)" \
     -DCMAKE_BUILD_TYPE=Release \
     .. && \
@@ -1460,6 +1465,7 @@ RUN \
   cd build && \
   cmake \
     -G"Unix Makefiles" \
+    -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DARM="$(if [ $(uname -m) == aarch64 ]; then echo TRUE; else echo FALSE; fi)" \
     -DCMAKE_BUILD_TYPE=Release \
     .. && \
@@ -1480,7 +1486,7 @@ RUN \
     --disable-dependency-tracking \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) install
+  make V=1 -j$(nproc) install
 
 # highway is the only third_party source of libjxl this build uses
 # bump: highway /HIGHWAY_VERSION=([\d.]+)/ https://github.com/google/highway.git|^1
@@ -1568,7 +1574,7 @@ RUN \
     --disable-curve-keygen \
     --without-docs \
     --enable-static && \
-  make -j$(nproc) install
+  make V=1 -j$(nproc) install
 
 # bump: vvenc /VVENC_VERSION=([\d.]+)/ https://github.com/fraunhoferhhi/vvenc.git|*
 # bump: vvenc after ./hashupdate Dockerfile VVENC $LATEST
@@ -1584,6 +1590,7 @@ RUN \
   cmake \
     -S . \
     -B build/release-static \
+    -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DVVENC_ENABLE_WERROR=OFF \
     -DVVENC_LIBRARY_ONLY=ON \
     -DCMAKE_BUILD_TYPE=Release \
@@ -1617,7 +1624,7 @@ RUN \
   --enable-${LTO_FLAGS#-f} \
   --pkg-config-flags="--static" \
   --extra-cflags="-fopenmp" \
-  --extra-ldflags="-fopenmp -Wl,-z,stack-size=2097152 $(if [ $(uname -m) == x86_64 ]; then echo -mincoming-stack-boundary=4; fi)" \
+  --extra-ldflags="-fopenmp -Wl,-z,stack-size=2097152 -Wl,-Map=%.map $(if [ $(uname -m) == x86_64 ]; then echo -mincoming-stack-boundary=4; fi)" \
   --toolchain=hardened \
   --disable-debug \
   --disable-shared \
@@ -1684,7 +1691,11 @@ RUN \
   --enable-libzmq \
   --enable-openssl \
   || (cat ffbuild/config.log ; false) \
-  && make -j$(nproc) install-progs
+  && make V=1 -j$(nproc) install-progs
+
+RUN \
+  sed -E -n '/^Archive member included/,/^(Discarded|Memory|Allocating)/p' /ffmpeg-*/ffmpeg_g.map /ffmpeg-*/ffprobe_g.map && \
+  for a in /usr/local/lib/*.a; do echo "$(readelf -SW "$a" | grep -c '\.gnu\.lto_\.opts')/$(ar t "$a" | wc -l) $a"; done
 
 RUN \
   EXPAT_VERSION=$(pkg-config --modversion expat) \
