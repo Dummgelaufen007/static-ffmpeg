@@ -1210,6 +1210,7 @@ RUN \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DBUILD_SHARED_LIBS=OFF \
     -DBUILD_APPS=OFF \
+    -DSVT_AV1_LTO=OFF \
     -DENABLE_AVX512=ON \
     -DCMAKE_BUILD_TYPE=Release \
     .. && \
@@ -1630,6 +1631,7 @@ RUN \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DVVENC_ENABLE_WERROR=OFF \
     -DVVENC_LIBRARY_ONLY=ON \
+    -DVVENC_ENABLE_LINK_TIME_OPT=OFF \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/usr/local && \
   cmake --build build/release-static -j$(nproc) && \
