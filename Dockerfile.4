@@ -1423,7 +1423,7 @@ RUN \
   cd xvidcore/build/generic && \
   # gnu18 to fix issue type own bool typedef
   CFLAGS="$CFLAGS -std=gnu18 -fstrength-reduce -ffast-math" ./configure && \
-  sed -i 's/^\t@\$(CC) -c/\t$(CC) -c/' Makefile && \
+  sed -i -e 's/^\t@\$(CC) -c/\t$(CC) -c/' -e 's/^\t@\$(AS) /\t$(AS) /' Makefile && \
   make -j$(nproc) && make install
 
 # bump: xeve /XEVE_VERSION=([\d.]+)/ https://github.com/mpeg5/xeve.git|*
@@ -1695,7 +1695,7 @@ RUN \
 
 RUN \
   sed -E -n '/^Archive member included/,/^(Discarded|Memory|Allocating)/p' /ffmpeg-*/ffmpeg_g.map /ffmpeg-*/ffprobe_g.map && \
-  for a in /usr/local/lib/*.a; do echo "$(readelf -SW "$a" | grep -c '\.gnu\.lto_\.opts')/$(ar t "$a" | wc -l) $a"; done
+  for a in /usr/local/lib/*.a /usr/local/lib/*/*.a; do echo "$(readelf -SW "$a" | grep -c '\.gnu\.lto_\.opts')/$(ar t "$a" | wc -l) $a"; done
 
 RUN \
   EXPAT_VERSION=$(pkg-config --modversion expat) \
