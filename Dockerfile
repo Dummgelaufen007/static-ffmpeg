@@ -304,6 +304,30 @@ RUN \
     --disable-shared && \
   make -j$(nproc) && make install
 
+# bump: chromaprint /CHROMAPRINT_VERSION=([\d.]+)/ https://github.com/acoustid/chromaprint.git|*
+# bump: chromaprint after ./hashupdate Dockerfile CHROMAPRINT $LATEST
+# bump: chromaprint link "NEWS" https://github.com/acoustid/chromaprint/blob/master/NEWS.txt
+ARG CHROMAPRINT_VERSION=1.6.1
+ARG CHROMAPRINT_URL="https://github.com/acoustid/chromaprint/releases/download/v$CHROMAPRINT_VERSION/chromaprint-$CHROMAPRINT_VERSION.tar.gz"
+ARG CHROMAPRINT_FILE="chromaprint.$CHROMAPRINT_VERSION.tar.gz"
+ARG CHROMAPRINT_SHA256=3368805af0ee47b9df74df10b5001a44569e01df2844dab520031720dde9ad23
+RUN \
+  wget -O $CHROMAPRINT_FILE $WGET_OPTS "$CHROMAPRINT_URL" && \
+  echo "$CHROMAPRINT_SHA256  $CHROMAPRINT_FILE" | sha256sum -c - && \
+  tar $TAR_OPTS $CHROMAPRINT_FILE && \
+  cd chromaprint-* && \
+  cmake -B build \
+    -G"Unix Makefiles" \
+    -DCMAKE_VERBOSE_MAKEFILE=ON \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_LIBDIR=lib \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DBUILD_TESTS=OFF \
+    -DFFT_LIB=fftw3 && \
+  cmake --build build -j$(nproc) && \
+  cmake --install build
+RUN echo "Libs.private: -lfftw3 -lstdc++" >> /usr/local/lib/pkgconfig/libchromaprint.pc
+
 # before libass, which uses it for unicode line breaking; alpine has no static build
 # bump: libunibreak /LIBUNIBREAK_VERSION=([\d.]+)/ gitrefs:https://github.com/adah1972/libunibreak.git|re:#^refs/tags/libunibreak_(\d+)_(\d+)$#${1}.${2}#|*
 # bump: libunibreak after sed -i -E "s#/libunibreak_[0-9_]+/#/libunibreak_$(echo $LATEST | tr . _)/#" Dockerfile && ./hashupdate Dockerfile LIBUNIBREAK $LATEST
@@ -570,6 +594,24 @@ RUN \
     -DBUILD_TESTS=OFF \
     .. && \
   make -j$(nproc) install
+
+# bump: openapv /OPENAPV_VERSION=([\d.]+)/ https://github.com/AcademySoftwareFoundation/openapv.git|*
+# bump: openapv after ./hashupdate Dockerfile OPENAPV $LATEST
+# bump: openapv link "Release notes" https://github.com/AcademySoftwareFoundation/openapv/releases/tag/v$LATEST
+ARG OPENAPV_VERSION=1.1.3.0
+ARG OPENAPV_URL="https://github.com/AcademySoftwareFoundation/openapv/archive/refs/tags/v$OPENAPV_VERSION.tar.gz"
+ARG OPENAPV_FILE="openapv.$OPENAPV_VERSION.tar.gz"
+ARG OPENAPV_SHA256=38f841ce44e80c40b682a5323b4f3ebc6e339b6071965bc1c705a17d46ab2fc8
+RUN \
+  wget -O $OPENAPV_FILE $WGET_OPTS "$OPENAPV_URL" && \
+  echo "$OPENAPV_SHA256  $OPENAPV_FILE" | sha256sum -c - && \
+  tar $TAR_OPTS $OPENAPV_FILE && \
+  cd openapv-* && \
+  cmake -B build \
+    -DOAPV_BUILD_APPS=OFF \
+    -DOAPV_BUILD_SHARED_LIB=OFF && \
+  cmake --build build -j$(nproc) && \
+  cmake --install build
 
 # bump: opencoreamr /OPENCOREAMR_VERSION=([\d.]+)/ fetch:https://sourceforge.net/projects/opencore-amr/files/opencore-amr/|/opencore-amr-([\d.]+).tar.gz/
 # bump: opencoreamr after ./hashupdate Dockerfile OPENCOREAMR $LATEST
@@ -1316,6 +1358,10 @@ ARG FFMPEG_VERSION=9.0.2
 ARG FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz"
 ARG FFMPEG_FILE="ffmpeg.$FFMPEG_VERSION.tar.xz"
 ARG FFMPEG_SHA256=8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e
+# openapv >= 1.1 API, in release/9.0 after 9.0.2
+ARG FFMPEG_OAPV_URL="https://github.com/FFmpeg/FFmpeg/commit/c54710db21c1827dbc3e47658a562525af0fe528.patch"
+ARG FFMPEG_OAPV_FILE="ffmpeg.oapv.patch"
+ARG FFMPEG_OAPV_SHA256=f773a85ec68f3b26e0b2ab3cddb7a304df5be8eb5c1887c9b627e23e782c7ec2
 # sed changes --toolchain=hardened -pie to -static-pie
 #
 # ldflags stack-size=2097152 is to increase default stack size from 128KB (musl default) to something
@@ -1324,8 +1370,11 @@ ARG FFMPEG_SHA256=8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e00
 RUN \
   wget -O $FFMPEG_FILE $WGET_OPTS "$FFMPEG_URL" && \
   echo "$FFMPEG_SHA256  $FFMPEG_FILE" | sha256sum -c - && \
+  wget -O $FFMPEG_OAPV_FILE $WGET_OPTS "$FFMPEG_OAPV_URL" && \
+  echo "$FFMPEG_OAPV_SHA256  $FFMPEG_OAPV_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $FFMPEG_FILE && \
   cd ffmpeg-* && \
+  patch -p1 < ../$FFMPEG_OAPV_FILE && \
   FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-nonfree " ;else echo ""; fi) && \
   sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
   ./configure \
@@ -1341,6 +1390,7 @@ RUN \
   --enable-gpl \
   --enable-version3 \
   $FDKAAC_FLAGS \
+  --enable-chromaprint \
   --enable-fontconfig \
   --enable-gray \
   --enable-iconv \
@@ -1361,6 +1411,7 @@ RUN \
   --enable-libmodplug \
   --enable-libmp3lame \
   --enable-libmysofa \
+  --enable-liboapv \
   --enable-libopencore-amrnb \
   --enable-libopencore-amrwb \
   --enable-libopenjpeg \
@@ -1417,6 +1468,7 @@ RUN \
   SOXR_VERSION=$(pkg-config --modversion soxr) \
   jq -n \
   '{ \
+  chromaprint: env.CHROMAPRINT_VERSION, \
   expat: env.EXPAT_VERSION, \
   "libfdk-aac": env.FDK_AAC_VERSION, \
   ffmpeg: env.FFMPEG_VERSION, \
@@ -1440,6 +1492,7 @@ RUN \
   libmodplug: env.LIBMODPLUG_VERSION, \
   libmp3lame: env.MP3LAME_VERSION, \
   libmysofa: env.LIBMYSOFA_VERSION, \
+  liboapv: env.OPENAPV_VERSION, \
   libogg: env.OGG_VERSION, \
   libopencoreamr: env.OPENCOREAMR_VERSION, \
   libopenjpeg: env.OPENJPEG_VERSION, \
