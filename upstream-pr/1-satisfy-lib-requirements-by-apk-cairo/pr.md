@@ -1,4 +1,4 @@
-# No hidden download in the cairo step
+# Satisfy lib requirements by apk: cairo
 
 The cairo step downloads more than its own source: pixman is not installed, so meson fetches it during that step ([master build](https://github.com/wader/static-ffmpeg/actions/runs/41099660522/job/124214372586)).
 

@@ -1,4 +1,4 @@
-# No hidden downloads in the glib step
+# Satisfy lib requirements by apk: glib
 
 The glib step downloads more than its own source: when glib needs a library that is not installed, meson fetches it during that step ([master build](https://github.com/wader/static-ffmpeg/actions/runs/41099660522/job/124214372586)).
 
