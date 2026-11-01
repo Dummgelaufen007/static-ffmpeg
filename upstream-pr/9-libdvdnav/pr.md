@@ -19,6 +19,7 @@ The recipe adds `-D_LARGEFILE64_SOURCE` to the `Cflags` of `dvdread.pc`, so ever
 | `Dockerfile` | `--enable-libdvdnav --enable-libdvdread` for ffmpeg |
 | `Dockerfile` | `libdvdcss`, `libdvdnav`, `libdvdread` in `versions.json`; `libdvdcss` removed when `ENABLE_LIBDVDCSS` is empty |
 | `README.md` | libdvdcss, libdvdnav and libdvdread in the list of libraries; section on libdvdcss with its build arg |
+| `.github/workflows/ci.yml` | `ENABLE_LIBDVDCSS=1`, so CI builds libdvdcss too, like fdk-aac |
 
 ## Build args
 
