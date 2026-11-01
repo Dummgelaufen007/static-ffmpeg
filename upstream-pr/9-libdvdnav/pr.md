@@ -18,7 +18,7 @@ The recipe adds `-D_LARGEFILE64_SOURCE` to the `Cflags` of `dvdread.pc`, so ever
 | `Dockerfile` | `-D_LARGEFILE64_SOURCE` added to the `Cflags` of `dvdread.pc` |
 | `Dockerfile` | `--enable-libdvdnav --enable-libdvdread` for ffmpeg |
 | `Dockerfile` | `libdvdcss`, `libdvdnav`, `libdvdread` in `versions.json`; `libdvdcss` removed when `ENABLE_LIBDVDCSS` is empty |
-| `README.md` | libdvdnav and libdvdread in the list of libraries |
+| `README.md` | libdvdcss, libdvdnav and libdvdread in the list of libraries; section on libdvdcss with its build arg |
 
 ## Build args
 
