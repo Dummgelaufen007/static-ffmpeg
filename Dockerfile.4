@@ -28,6 +28,7 @@ RUN apk add --no-cache $APK_OPTS \
   rust cargo cargo-c \
   ca-certificates \
   bash \
+  # unpacks the .tar.xz sources before the own xz is built
   tar xz \
   build-base \
   autoconf automake \
@@ -37,18 +38,18 @@ RUN apk add --no-cache $APK_OPTS \
   git \
   yasm nasm \
   jq \
+  # needed by aom
   xxd \
+  # needed by fontconfig
   gperf \
+  # needed by the autoreconf of xz
   gettext-tiny \
+  # needed by glib
   python3 py3-packaging \
+  # needed by rtmpdump
   linux-headers \
+  # replaces the proxy-libintl download of glib
   musl-libintl
-
-# linux-headers need by rtmpdump
-# python3 py3-packaging needed by glib
-# musl-libintl replaces the proxy-libintl download of glib
-# gperf is needed by fontconfig, gettext-tiny by the autoreconf of xz
-# xz unpacks the .tar.xz sources before the own xz is built
 
 # --no-same-owner as we don't care about uid/gid even if we run as root. fixes invalid gid/uid issue.
 ARG TAR_OPTS="--no-same-owner --extract --file"
@@ -456,9 +457,9 @@ RUN \
     -Denable_tools=false \
     -Denable_avx512=true \
     -Denable_float=true && \
-  ninja -j$(nproc) -vC build install
+  ninja -j$(nproc) -vC build install && \
 # extra libs stdc++ is for vmaf https://github.com/Netflix/vmaf/issues/788
-RUN sed -i 's/-lvmaf /-lvmaf -lstdc++ /' /usr/local/lib/pkgconfig/libvmaf.pc
+  sed -i 's/-lvmaf /-lvmaf -lstdc++ /' /usr/local/lib/pkgconfig/libvmaf.pc
 
 # own build as alpine glib links with libmount etc
 # bump: glib /GLIB_VERSION=([\d.]+)/ https://gitlab.gnome.org/GNOME/glib.git|^2
@@ -479,9 +480,9 @@ RUN \
     -Dlibmount=disabled && \
   # only the targets with the install tags devel and bin-devel: libraries, headers, .pc files and build tools
   ninja -j$(nproc) -vC build $(jq -r --arg b "$PWD/build/" '.targets | to_entries[] | select(.value.tag == "devel" or .value.tag == "bin-devel") | .key | ltrimstr($b)' build/meson-info/intro-install_plan.json) && \
-  meson install -C build --no-rebuild --tags devel,bin-devel
+  meson install -C build --no-rebuild --tags devel,bin-devel && \
 # exported symbols keep rust thread locals as unresolved relocations that a static pie never applies
-RUN sed -i 's/-Wl,--export-dynamic//' /usr/local/lib/pkgconfig/gmodule-2.0.pc /usr/local/lib/pkgconfig/gmodule-export-2.0.pc
+  sed -i 's/-Wl,--export-dynamic//' /usr/local/lib/pkgconfig/gmodule-2.0.pc /usr/local/lib/pkgconfig/gmodule-export-2.0.pc
 
 # bump: harfbuzz /LIBHARFBUZZ_VERSION=([\d.]+)/ https://github.com/harfbuzz/harfbuzz.git|*
 # bump: harfbuzz after ./hashupdate Dockerfile LIBHARFBUZZ $LATEST
@@ -663,8 +664,8 @@ RUN \
     -DBUILD_TESTS=OFF \
     -DFFT_LIB=fftw3 && \
   cmake --build build -j$(nproc) && \
-  cmake --install build
-RUN echo "Libs.private: -lfftw3 -lstdc++" >> /usr/local/lib/pkgconfig/libchromaprint.pc
+  cmake --install build && \
+  echo "Libs.private: -lfftw3 -lstdc++" >> /usr/local/lib/pkgconfig/libchromaprint.pc
 
 # before libass, which uses it for unicode line breaking; alpine has no static build
 # bump: libunibreak /LIBUNIBREAK_VERSION=([\d.]+)/ gitrefs:https://github.com/adah1972/libunibreak.git|re:#^refs/tags/libunibreak_(\d+)_(\d+)$#${1}.${2}#|*
@@ -1280,8 +1281,8 @@ RUN \
     -DBUILD_SHARED_LIBS=OFF \
     -DUSE_OMP=ON \
     .. && \
-  make -j$(nproc) install
-RUN echo "Libs.private: -ldl" >> /usr/local/lib/pkgconfig/vidstab.pc
+  make -j$(nproc) install && \
+  echo "Libs.private: -ldl" >> /usr/local/lib/pkgconfig/vidstab.pc
 
 # bump: vorbis /VORBIS_VERSION=([\d.]+)/ https://github.com/xiph/vorbis.git|*
 # bump: vorbis after ./hashupdate Dockerfile VORBIS $LATEST
@@ -1535,9 +1536,8 @@ RUN \
     -DJPEGXL_FORCE_SYSTEM_BROTLI=ON \
     -DJPEGXL_FORCE_SYSTEM_HWY=ON && \
   cmake --build build -j$(nproc) && \
-  cmake --install build
+  cmake --install build && \
 # workaround for ffmpeg configure script
-RUN \
   sed -i 's/-ljxl/-ljxl -lstdc++ /' /usr/local/lib/pkgconfig/libjxl.pc && \
   sed -i 's/-ljxl_cms/-ljxl_cms -lstdc++ /' /usr/local/lib/pkgconfig/libjxl_cms.pc && \
   sed -i 's/-ljxl_threads/-ljxl_threads -lstdc++ /' /usr/local/lib/pkgconfig/libjxl_threads.pc

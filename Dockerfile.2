@@ -37,15 +37,22 @@ RUN apk add --no-cache $APK_OPTS \
   fftw-dev fftw-static \
   libsamplerate-dev libsamplerate-static \
   xz-dev xz-static \
+  # needed by glib
   python3 py3-packaging \
+  # needed by rtmpdump
   linux-headers \
+  # replace the pcre2 and libffi downloads of glib
   pcre2-dev pcre2-static libffi-dev \
-  pixman-dev pixman-static
-
-# linux-headers need by rtmpdump
-# python3 py3-packaging needed by glib
-# pcre2-dev pcre2-static libffi-dev replace the pcre2 and libffi downloads of glib
-# pixman-dev pixman-static replace the pixman download of cairo
+  # replace the pixman download of cairo
+  pixman-dev pixman-static \
+  # needed by aom
+  xxd \
+  # replaces the proxy-libintl download of glib
+  musl-libintl \
+  # needed by ffmpeg
+  soxr-dev soxr-static \
+  vo-amrwbenc-dev vo-amrwbenc-static \
+  snappy snappy-dev snappy-static
 
 # -O3 makes sure we compile with optimization. setting CFLAGS/CXXFLAGS seems to override
 # default automake cflags.
@@ -64,8 +71,6 @@ RUN apk add --no-cache $APK_OPTS rust cargo cargo-c
 
 # hard: -DCONFIG_TUNE_VMAF=1 and the libvmaf.pc sed need vmaf
 FROM base AS aom
-ARG APK_OPTS
-RUN apk add --no-cache $APK_OPTS xxd
 # bump: vmaf /VMAF_VERSION=([\d.]+)/ https://github.com/Netflix/vmaf.git|*
 # bump: vmaf after ./hashupdate Dockerfile VMAF $LATEST
 # bump: vmaf link "Release" https://github.com/Netflix/vmaf/releases/tag/v$LATEST
@@ -86,9 +91,9 @@ RUN \
     -Denable_tools=false \
     -Denable_avx512=true \
     -Denable_float=true && \
-  ninja -j$(nproc) -vC build install
+  ninja -j$(nproc) -vC build install && \
 # extra libs stdc++ is for vmaf https://github.com/Netflix/vmaf/issues/788
-RUN sed -i 's/-lvmaf /-lvmaf -lstdc++ /' /usr/local/lib/pkgconfig/libvmaf.pc && \
+  sed -i 's/-lvmaf /-lvmaf -lstdc++ /' /usr/local/lib/pkgconfig/libvmaf.pc && \
   echo "$VMAF_VERSION" > /usr/local/share/versions/libvmaf
 
 # bump: aom /AOM_VERSION=([\d.]+)/ fetch:https://storage.googleapis.com/aom-releases/|/libaom-([\d.]+)\.tar\.gz/|*
@@ -177,14 +182,11 @@ RUN \
     -DFFT_LIB=fftw3 && \
   cmake --build build -j$(nproc) && \
   cmake --install build && \
-  echo "$CHROMAPRINT_VERSION" > /usr/local/share/versions/chromaprint
-RUN echo "Libs.private: -lfftw3 -lstdc++" >> /usr/local/lib/pkgconfig/libchromaprint.pc
+  echo "$CHROMAPRINT_VERSION" > /usr/local/share/versions/chromaprint && \
+  echo "Libs.private: -lfftw3 -lstdc++" >> /usr/local/lib/pkgconfig/libchromaprint.pc
 
 # hard: pango needs glib, harfbuzz and cairo; librsvg needs rust, pango and, for -Davif=enabled, dav1d; libass needs harfbuzz, which is not an apk package, and, for --enable-libunibreak, libunibreak
 FROM rust AS libass
-ARG APK_OPTS
-# musl-libintl replaces the proxy-libintl download of glib
-RUN apk add --no-cache $APK_OPTS musl-libintl
 # bump: glib /GLIB_VERSION=([\d.]+)/ https://gitlab.gnome.org/GNOME/glib.git|^2
 # bump: glib after ./hashupdate Dockerfile GLIB $LATEST
 # bump: glib link "NEWS" https://gitlab.gnome.org/GNOME/glib/-/blob/main/NEWS?ref_type=heads
@@ -205,9 +207,9 @@ RUN \
     -Dlibmount=disabled && \
   # only the targets with the install tags devel and bin-devel: libraries, headers, .pc files and build tools
   ninja -j$(nproc) -vC build $(jq -r --arg b "$PWD/build/" '.targets | to_entries[] | select(.value.tag == "devel" or .value.tag == "bin-devel") | .key | ltrimstr($b)' build/meson-info/intro-install_plan.json) && \
-  meson install -C build --no-rebuild --tags devel,bin-devel
+  meson install -C build --no-rebuild --tags devel,bin-devel && \
 # exported symbols keep rust thread locals as unresolved relocations that a static pie never applies
-RUN sed -i 's/-Wl,--export-dynamic//' /usr/local/lib/pkgconfig/gmodule-2.0.pc /usr/local/lib/pkgconfig/gmodule-export-2.0.pc
+  sed -i 's/-Wl,--export-dynamic//' /usr/local/lib/pkgconfig/gmodule-2.0.pc /usr/local/lib/pkgconfig/gmodule-export-2.0.pc
 
 # bump: harfbuzz /LIBHARFBUZZ_VERSION=([\d.]+)/ https://github.com/harfbuzz/harfbuzz.git|*
 # bump: harfbuzz after ./hashupdate Dockerfile LIBHARFBUZZ $LATEST
@@ -994,8 +996,8 @@ RUN \
     -DBUILD_SHARED_LIBS=OFF \
     -DUSE_OMP=ON \
     .. && \
-  make -j$(nproc) install
-RUN echo "Libs.private: -ldl" >> /usr/local/lib/pkgconfig/vidstab.pc && \
+  make -j$(nproc) install && \
+  echo "Libs.private: -ldl" >> /usr/local/lib/pkgconfig/vidstab.pc && \
   echo "$VIDSTAB_VERSION" > /usr/local/share/versions/libvidstab
 
 FROM base AS libvpx
@@ -1281,9 +1283,8 @@ RUN \
     -DJPEGXL_FORCE_SYSTEM_BROTLI=ON \
     -DJPEGXL_FORCE_SYSTEM_HWY=ON && \
   cmake --build build -j$(nproc) && \
-  cmake --install build
+  cmake --install build && \
 # workaround for ffmpeg configure script
-RUN \
   sed -i 's/-ljxl/-ljxl -lstdc++ /' /usr/local/lib/pkgconfig/libjxl.pc && \
   sed -i 's/-ljxl_cms/-ljxl_cms -lstdc++ /' /usr/local/lib/pkgconfig/libjxl_cms.pc && \
   sed -i 's/-ljxl_threads/-ljxl_threads -lstdc++ /' /usr/local/lib/pkgconfig/libjxl_threads.pc && \
@@ -1338,10 +1339,6 @@ RUN \
 
 FROM base AS builder
 ARG APK_OPTS
-RUN apk add --no-cache $APK_OPTS \
-  soxr-dev soxr-static \
-  vo-amrwbenc-dev vo-amrwbenc-static \
-  snappy snappy-dev snappy-static
 COPY --link --from=aom /usr/local/ /usr/local/
 COPY --link --from=libaribb24 /usr/local/ /usr/local/
 COPY --link --from=chromaprint /usr/local/ /usr/local/
