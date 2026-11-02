@@ -30,17 +30,11 @@ RUN apk add --no-cache $APK_OPTS \
   expat-dev expat-static \
   fontconfig-dev fontconfig-static \
   freetype freetype-dev freetype-static \
-  graphite2-static \
-  tiff tiff-dev \
-  libjpeg-turbo libjpeg-turbo-dev \
   libpng-dev libpng-static \
-  giflib giflib-dev \
   fribidi-dev fribidi-static \
   brotli-dev brotli-static \
   soxr-dev soxr-static \
-  tcl \
   numactl-dev \
-  cunit cunit-dev \
   fftw-dev fftw-static \
   libsamplerate-dev libsamplerate-static \
   vo-amrwbenc-dev vo-amrwbenc-static \
@@ -80,6 +74,7 @@ RUN \
     -Dbuilt_in_models=true \
     -Denable_tests=false \
     -Denable_docs=false \
+    -Denable_tools=false \
     -Denable_avx512=true \
     -Denable_float=true && \
   ninja -j$(nproc) -vC build install
@@ -99,24 +94,35 @@ RUN \
   meson setup build \
     -Dbuildtype=release \
     -Ddefault_library=static \
+    -Dtests=false \
+    -Dsysprof=disabled \
     -Dglib_debug=disabled \
     -Dlibmount=disabled && \
-  ninja -j$(nproc) -vC build install
+  # only the targets with the install tags devel and bin-devel: libraries, headers, .pc files and build tools
+  ninja -j$(nproc) -vC build $(jq -r --arg b "$PWD/build/" '.targets | to_entries[] | select(.value.tag == "devel" or .value.tag == "bin-devel") | .key | ltrimstr($b)' build/meson-info/intro-install_plan.json) && \
+  meson install -C build --no-rebuild --tags devel,bin-devel
 # exported symbols keep rust thread locals as unresolved relocations that a static pie never applies
 RUN sed -i 's/-Wl,--export-dynamic//' /usr/local/lib/pkgconfig/gmodule-2.0.pc /usr/local/lib/pkgconfig/gmodule-export-2.0.pc
 
 # bump: harfbuzz /LIBHARFBUZZ_VERSION=([\d.]+)/ https://github.com/harfbuzz/harfbuzz.git|*
 # bump: harfbuzz after ./hashupdate Dockerfile LIBHARFBUZZ $LATEST
 # bump: harfbuzz link "NEWS" https://github.com/harfbuzz/harfbuzz/blob/main/NEWS
-ARG LIBHARFBUZZ_VERSION=14.6.0
+ARG LIBHARFBUZZ_VERSION=15.0.0
 ARG LIBHARFBUZZ_URL="https://github.com/harfbuzz/harfbuzz/releases/download/$LIBHARFBUZZ_VERSION/harfbuzz-$LIBHARFBUZZ_VERSION.tar.xz"
-ARG LIBHARFBUZZ_SHA256=d07a007327277708a2a73ae437887cdbaf282937f6d03ca5467723e9099af586
+ARG LIBHARFBUZZ_SHA256=968536e9abd782f07f7954044c0c4020199fcdd39b41d221ec42d2a3be4a44df
 ADD --checksum=sha256:$LIBHARFBUZZ_SHA256 --unpack=true $LIBHARFBUZZ_URL /
 RUN \
   cd harfbuzz-* && \
   meson setup build \
     -Dbuildtype=release \
-    -Ddefault_library=static && \
+    -Ddefault_library=static \
+    -Dgobject=disabled \
+    -Dsubset=disabled \
+    -Draster=disabled \
+    -Dvector=disabled \
+    -Dgpu=disabled \
+    -Dtests=disabled \
+    -Dutilities=disabled && \
   ninja -j$(nproc) -vC build install
 
 # bump: cairo /CAIRO_VERSION=([\d.]+)/ https://gitlab.freedesktop.org/cairo/cairo.git|^1
@@ -132,6 +138,7 @@ RUN \
     -Dbuildtype=release \
     -Ddefault_library=static \
     -Dtests=disabled \
+    -Dtee=disabled \
     -Dquartz=disabled \
     -Dxcb=disabled \
     -Dxlib=disabled \
@@ -145,24 +152,41 @@ RUN \
 ARG PANGO_VERSION=1.58.2
 ARG PANGO_URL="https://download.gnome.org/sources/pango/${PANGO_VERSION%.*}/pango-$PANGO_VERSION.tar.xz"
 ARG PANGO_SHA256=342385b6ca3b7c73455d7c80a13b7dbe4489e00bc3bd4c5bd6ed4dce421e374a
-# TODO: add -Dbuild-testsuite=false when in stable release
-# TODO: -Ddefault_library=both currently to not fail building tests
 ADD --checksum=sha256:$PANGO_SHA256 --unpack=true $PANGO_URL /
 RUN \
   cd pango-* && \
   meson setup build \
     -Dbuildtype=release \
-    -Ddefault_library=both \
+    -Ddefault_library=static \
     -Dintrospection=disabled \
+    -Dbuild-testsuite=false \
+    -Dbuild-examples=false \
     -Dgtk_doc=false && \
+  ninja -j$(nproc) -vC build install
+
+# before librsvg, which uses it for avif
+# bump: dav1d /DAV1D_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/dav1d/last/|/dav1d-([\d.]+)\.tar\.xz/
+# bump: dav1d after ./hashupdate Dockerfile DAV1D $LATEST
+# bump: dav1d link "Release notes" https://code.videolan.org/videolan/dav1d/-/tags/$LATEST
+ARG DAV1D_VERSION=1.5.4
+ARG DAV1D_URL="https://download.videolan.org/pub/videolan/dav1d/$DAV1D_VERSION/dav1d-$DAV1D_VERSION.tar.xz"
+ARG DAV1D_SHA256=686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5
+ADD --checksum=sha256:$DAV1D_SHA256 --unpack=true $DAV1D_URL /
+RUN \
+  cd dav1d-* && \
+  meson setup build \
+    -Dbuildtype=release \
+    -Ddefault_library=static \
+    -Denable_tools=false \
+    -Denable_tests=false && \
   ninja -j$(nproc) -vC build install
 
 # bump: librsvg /LIBRSVG_VERSION=([\d.]+)/ https://gitlab.gnome.org/GNOME/librsvg.git|^2
 # bump: librsvg after ./hashupdate Dockerfile LIBRSVG $LATEST
 # bump: librsvg link "NEWS" https://gitlab.gnome.org/GNOME/librsvg/-/blob/master/NEWS
-ARG LIBRSVG_VERSION=2.63.3
+ARG LIBRSVG_VERSION=2.63.4
 ARG LIBRSVG_URL="https://download.gnome.org/sources/librsvg/${LIBRSVG_VERSION%.*}/librsvg-$LIBRSVG_VERSION.tar.xz"
-ARG LIBRSVG_SHA256=55311c2293612e4a2e38cd9bdb6160a1c85c158adc7c97e423e1e65949afb6a4
+ARG LIBRSVG_SHA256=31f07d9350dad3f8964fd613c31309ac160fdef13dfac59df6fd082de78d6e8f
 ADD --checksum=sha256:$LIBRSVG_SHA256 --unpack=true $LIBRSVG_URL /
 RUN \
   cd librsvg-* && \
@@ -172,6 +196,7 @@ RUN \
     -Dbuildtype=release \
     -Ddefault_library=static \
     -Ddocs=disabled \
+    -Davif=enabled \
     -Dintrospection=disabled \
     -Dpixbuf=disabled \
     -Dpixbuf-loader=disabled \
@@ -184,9 +209,9 @@ RUN \
 # bump: aom /AOM_VERSION=([\d.]+)/ fetch:https://storage.googleapis.com/aom-releases/|/libaom-([\d.]+)\.tar\.gz/|*
 # bump: aom after ./hashupdate Dockerfile AOM $LATEST
 # bump: aom link "CHANGELOG" https://aomedia.googlesource.com/aom/+/refs/tags/v$LATEST/CHANGELOG
-ARG AOM_VERSION=3.15.2
+ARG AOM_VERSION=3.15.3
 ARG AOM_URL="https://storage.googleapis.com/aom-releases/libaom-$AOM_VERSION.tar.gz"
-ARG AOM_SHA256=67bb54b245f33ed98600e08269e6139986e48114e14042474ddd8885801dfddc
+ARG AOM_SHA256=12c01dc731ed7b5a999e28120b45bf58a002ba3435a4ba2cfbc1e084a27c9c04
 ADD --checksum=sha256:$AOM_SHA256 --unpack=true $AOM_URL /
 RUN \
   cd libaom-* && \
@@ -283,18 +308,55 @@ RUN \
   cd libbluray-* && \
   meson setup build \
     -Dbuildtype=release \
-    -Ddefault_library=static && \
+    -Ddefault_library=static \
+    -Denable_tools=false \
+    -Dfreetype=disabled && \
   ninja -j$(nproc) -vC build install
 
-# bump: dav1d /DAV1D_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/dav1d/last/|/dav1d-([\d.]+)\.tar\.xz/
-# bump: dav1d after ./hashupdate Dockerfile DAV1D $LATEST
-# bump: dav1d link "Release notes" https://code.videolan.org/videolan/dav1d/-/tags/$LATEST
-ARG DAV1D_VERSION=1.5.4
-ARG DAV1D_URL="https://download.videolan.org/pub/videolan/dav1d/$DAV1D_VERSION/dav1d-$DAV1D_VERSION.tar.xz"
-ARG DAV1D_SHA256=686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5
-ADD --checksum=sha256:$DAV1D_SHA256 --unpack=true $DAV1D_URL /
+# bump: libdvdcss /LIBDVDCSS_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/libdvdcss/last/|/libdvdcss-([\d.]+)\.tar\.xz/
+# bump: libdvdcss after ./hashupdate Dockerfile LIBDVDCSS $LATEST
+# bump: libdvdcss link "NEWS" https://code.videolan.org/videolan/libdvdcss/-/blob/master/NEWS
+ARG LIBDVDCSS_VERSION=1.6.0
+ARG LIBDVDCSS_URL="https://download.videolan.org/pub/videolan/libdvdcss/$LIBDVDCSS_VERSION/libdvdcss-$LIBDVDCSS_VERSION.tar.xz"
+ARG LIBDVDCSS_SHA256=7ea556c846b7bfc32d47b41cae56d1863a6b6d5f706bb162778d6f298490977c
+ARG ENABLE_LIBDVDCSS=
+ADD --checksum=sha256:$LIBDVDCSS_SHA256 --unpack=true $LIBDVDCSS_URL /
 RUN \
-  cd dav1d-* && \
+  if [[ -n "$ENABLE_LIBDVDCSS" ]]; then \
+  cd libdvdcss-* && \
+  meson setup build \
+    -Dbuildtype=release \
+    -Ddefault_library=static && \
+  ninja -j$(nproc) -vC build install; \
+  fi
+
+# bump: libdvdread /LIBDVDREAD_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/libdvdread/last/|/libdvdread-([\d.]+)\.tar\.xz/
+# bump: libdvdread after ./hashupdate Dockerfile LIBDVDREAD $LATEST
+# bump: libdvdread link "NEWS" https://code.videolan.org/videolan/libdvdread/-/blob/master/NEWS
+ARG LIBDVDREAD_VERSION=7.1.1
+ARG LIBDVDREAD_URL="https://download.videolan.org/pub/videolan/libdvdread/$LIBDVDREAD_VERSION/libdvdread-$LIBDVDREAD_VERSION.tar.xz"
+ARG LIBDVDREAD_SHA256=a0d47876548bec806774bbf8dbf20bb19ba139464383156b32eb8e59915b90a9
+# without libdvdcss linked in, libdvdread tries to dlopen it, which a static binary cannot
+ADD --checksum=sha256:$LIBDVDREAD_SHA256 --unpack=true $LIBDVDREAD_URL /
+RUN \
+  cd libdvdread-* && \
+  meson setup build \
+    -Dbuildtype=release \
+    -Ddefault_library=static \
+    -Dlibdvdcss=$(if [[ -n "$ENABLE_LIBDVDCSS" ]]; then echo enabled; else echo disabled; fi) && \
+  ninja -j$(nproc) -vC build install
+# musl has off64_t of the public headers only if this is defined before the first sys/types.h
+RUN sed -i 's/^Cflags: .*/& -D_LARGEFILE64_SOURCE/' /usr/local/lib/pkgconfig/dvdread.pc
+
+# bump: libdvdnav /LIBDVDNAV_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/libdvdnav/last/|/libdvdnav-([\d.]+)\.tar\.xz/
+# bump: libdvdnav after ./hashupdate Dockerfile LIBDVDNAV $LATEST
+# bump: libdvdnav link "ChangeLog" https://code.videolan.org/videolan/libdvdnav/-/blob/master/ChangeLog
+ARG LIBDVDNAV_VERSION=7.0.0
+ARG LIBDVDNAV_URL="https://download.videolan.org/pub/videolan/libdvdnav/$LIBDVDNAV_VERSION/libdvdnav-$LIBDVDNAV_VERSION.tar.xz"
+ARG LIBDVDNAV_SHA256=a2a18f5ad36d133c74bf9106b6445806fa253b09141a46392550394b647b221e
+ADD --checksum=sha256:$LIBDVDNAV_SHA256 --unpack=true $LIBDVDNAV_URL /
+RUN \
+  cd libdvdnav-* && \
   meson setup build \
     -Dbuildtype=release \
     -Ddefault_library=static && \
@@ -424,15 +486,17 @@ RUN \
 # bump: lcms2 /LCMS2_VERSION=([\d.]+)/ https://github.com/mm2/Little-CMS.git|^2
 # bump: lcms2 after ./hashupdate Dockerfile LCMS2 $LATEST
 # bump: lcms2 link "Release" https://github.com/mm2/Little-CMS/releases/tag/lcms$LATEST
-ARG LCMS2_VERSION=2.19.1
+ARG LCMS2_VERSION=2.20
 ARG LCMS2_URL="https://github.com/mm2/Little-CMS/releases/download/lcms$LCMS2_VERSION/lcms2-$LCMS2_VERSION.tar.gz"
-ARG LCMS2_SHA256=bfc54f7bab59fbc921012014a8032e4cba4abd46db47d46b76416a8c0b2815c8
+ARG LCMS2_SHA256=18ff5504fa9cc8a2b1f3591180d90ead16c8a2ea78e530523b46eab70e1ca6b9
 ADD --checksum=sha256:$LCMS2_SHA256 --unpack=true $LCMS2_URL /
 RUN \
   cd lcms2-* && \
   ./autogen.sh && \
   ./configure \
     --enable-static \
+    --without-jpeg \
+    --without-tiff \
     --disable-shared && \
   make -j$(nproc) install
 
@@ -544,6 +608,7 @@ RUN \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_TESTING=OFF \
+    -DENABLE_SSL_SUPPORT=OFF \
     -DBUILD_TOOLS=OFF \
     -DBUILD_TOOLS_DOCS=OFF \
     -DRUN_SYSTEM_TESTS=OFF \
@@ -679,7 +744,7 @@ RUN \
     -DWITH_SFTP=ON \
     -DWITH_SERVER=OFF \
     -DWITH_ZLIB=ON \
-    -DWITH_PCAP=ON \
+    -DWITH_PCAP=OFF \
     -DWITH_DEBUG_CRYPTO=OFF \
     -DWITH_DEBUG_PACKET=OFF \
     -DWITH_DEBUG_CALLTRACE=OFF \
@@ -705,6 +770,8 @@ RUN \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DBUILD_SHARED_LIBS=OFF \
+    -DBUILD_APPS=OFF \
+    -DSVT_AV1_LTO=OFF \
     -DENABLE_AVX512=ON \
     -DCMAKE_BUILD_TYPE=Release \
     .. && \
@@ -767,7 +834,7 @@ RUN \
 # bump: uavs3d link "Source diff $CURRENT..$LATEST" https://github.com/uavs3/uavs3d/compare/$CURRENT..$LATEST
 ARG UAVS3D_URL="https://github.com/uavs3/uavs3d.git"
 ARG UAVS3D_COMMIT=0e20d2c291853f196c68922a264bcd8471d75b68
-# Removes BIT_DEPTH 10 to be able to build on other platforms. 10 was overkill anyways.
+# the 8 bit build rejects 10 bit streams
 ADD --keep-git-dir=true --checksum=$UAVS3D_COMMIT $UAVS3D_URL#$UAVS3D_COMMIT /uavs3d
 RUN \
   cd uavs3d && \
@@ -778,6 +845,7 @@ RUN \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_SHARED_LIBS=OFF \
+    -DCOMPILE_10BIT=1 \
     ../.. && \
   make -j$(nproc) install
 
@@ -836,6 +904,7 @@ RUN \
     --enable-vp9-highbitdepth \
     --disable-shared \
     --disable-unit-tests \
+    --disable-tools \
     --disable-examples && \
   make -j$(nproc) install
 
@@ -895,7 +964,7 @@ RUN \
   sed -i '/^cmake / s/$/ -G "Unix Makefiles" ${CMAKEFLAGS}/' ./multilib.sh && \
   sed -i 's/ -DENABLE_SHARED=OFF//g' ./multilib.sh && \
   MAKEFLAGS="-j$(nproc)" \
-  CMAKEFLAGS="-DENABLE_SHARED=OFF -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release" \
+  CMAKEFLAGS="-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release" \
   ./multilib.sh && \
   make -C 8bit -j$(nproc) install
 
@@ -1013,6 +1082,8 @@ RUN \
     -DJPEGXL_ENABLE_SJPEG=OFF \
     -DJPEGXL_ENABLE_SKCMS=OFF \
     -DJPEGXL_ENABLE_VIEWERS=OFF \
+    -DJPEGXL_ENABLE_TOOLS=OFF \
+    -DJPEGXL_ENABLE_TRANSCODE_JPEG=OFF \
     -DJPEGXL_FORCE_SYSTEM_GTEST=ON \
     -DJPEGXL_FORCE_SYSTEM_BROTLI=ON \
     -DJPEGXL_FORCE_SYSTEM_HWY=OFF && \
@@ -1037,6 +1108,9 @@ RUN \
   grep -r -l sha1_init external/sha1* | xargs sed -i 's/sha1_init/zeromq_sha1_init/g' && \
   ./configure \
     --disable-shared \
+    --disable-perf \
+    --disable-curve-keygen \
+    --without-docs \
     --enable-static && \
   make -j$(nproc) install
 
@@ -1054,6 +1128,8 @@ RUN \
     -S . \
     -B build/release-static \
     -DVVENC_ENABLE_WERROR=OFF \
+    -DVVENC_LIBRARY_ONLY=ON \
+    -DVVENC_ENABLE_LINK_TIME_OPT=OFF \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/usr/local && \
   cmake --build build/release-static -j$(nproc) && \
@@ -1104,6 +1180,8 @@ RUN \
   --enable-libbluray \
   --enable-libdav1d \
   --enable-libdavs2 \
+  --enable-libdvdnav \
+  --enable-libdvdread \
   --enable-libfreetype \
   --enable-libfribidi \
   --enable-libgme \
@@ -1181,6 +1259,9 @@ RUN \
   libbluray: env.LIBBLURAY_VERSION, \
   libdav1d: env.DAV1D_VERSION, \
   libdavs2: env.DAVS2_VERSION, \
+  libdvdcss: env.LIBDVDCSS_VERSION, \
+  libdvdnav: env.LIBDVDNAV_VERSION, \
+  libdvdread: env.LIBDVDREAD_VERSION, \
   libfreetype: env.FREETYPE_VERSION, \
   libfribidi: env.FRIBIDI_VERSION, \
   libgme: env.LIBGME_COMMIT, \
@@ -1230,7 +1311,8 @@ RUN \
   libzmq: env.LIBZMQ_VERSION, \
   openssl: env.OPENSSL_VERSION, \
   } \
-  | if env.ENABLE_FDKAAC == "" then del(."libfdk-aac") end' > /versions.json
+  | if env.ENABLE_FDKAAC == "" then del(."libfdk-aac") end \
+  | if env.ENABLE_LIBDVDCSS == "" then del(.libdvdcss) end' > /versions.json
 
 # make sure binaries has no dependencies, is relro, pie and stack nx
 RUN \
