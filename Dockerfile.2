@@ -7,6 +7,7 @@ ARG ALPINE_VERSION=alpine:3.24.3
 ARG APK_OPTS=""
 
 ARG ENABLE_FDKAAC=
+ARG ENABLE_LIBDVDCSS=
 
 FROM $ALPINE_VERSION AS base
 ARG APK_OPTS
@@ -410,6 +411,63 @@ RUN \
     --disable-cli && \
   make -j$(nproc) install && \
   echo "$DAVS2_VERSION" > /usr/local/share/versions/libdavs2
+
+# hard: libdvdnav requires libdvdread
+FROM base AS libdvdnav
+# bump: libdvdcss /LIBDVDCSS_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/libdvdcss/last/|/libdvdcss-([\d.]+)\.tar\.xz/
+# bump: libdvdcss after ./hashupdate Dockerfile LIBDVDCSS $LATEST
+# bump: libdvdcss link "NEWS" https://code.videolan.org/videolan/libdvdcss/-/blob/master/NEWS
+ARG LIBDVDCSS_VERSION=1.6.0
+ARG LIBDVDCSS_URL="https://download.videolan.org/pub/videolan/libdvdcss/$LIBDVDCSS_VERSION/libdvdcss-$LIBDVDCSS_VERSION.tar.xz"
+ARG LIBDVDCSS_FILE="libdvdcss.$LIBDVDCSS_VERSION.tar.xz"
+ARG LIBDVDCSS_SHA256=7ea556c846b7bfc32d47b41cae56d1863a6b6d5f706bb162778d6f298490977c
+ARG ENABLE_LIBDVDCSS
+ADD --checksum=sha256:$LIBDVDCSS_SHA256 --unpack=true $LIBDVDCSS_URL /
+RUN \
+  if [[ -n "$ENABLE_LIBDVDCSS" ]]; then \
+  cd libdvdcss-* && \
+  meson setup build \
+    -Dbuildtype=release \
+    -Ddefault_library=static && \
+  ninja -j$(nproc) -vC build install && \
+  echo "$LIBDVDCSS_VERSION" > /usr/local/share/versions/libdvdcss; \
+  fi
+
+# bump: libdvdread /LIBDVDREAD_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/libdvdread/last/|/libdvdread-([\d.]+)\.tar\.xz/
+# bump: libdvdread after ./hashupdate Dockerfile LIBDVDREAD $LATEST
+# bump: libdvdread link "NEWS" https://code.videolan.org/videolan/libdvdread/-/blob/master/NEWS
+ARG LIBDVDREAD_VERSION=7.1.1
+ARG LIBDVDREAD_URL="https://download.videolan.org/pub/videolan/libdvdread/$LIBDVDREAD_VERSION/libdvdread-$LIBDVDREAD_VERSION.tar.xz"
+ARG LIBDVDREAD_FILE="libdvdread.$LIBDVDREAD_VERSION.tar.xz"
+ARG LIBDVDREAD_SHA256=a0d47876548bec806774bbf8dbf20bb19ba139464383156b32eb8e59915b90a9
+ADD --checksum=sha256:$LIBDVDREAD_SHA256 --unpack=true $LIBDVDREAD_URL /
+# without libdvdcss linked in, libdvdread tries to dlopen it, which a static binary cannot
+RUN \
+  cd libdvdread-* && \
+  meson setup build \
+    -Dbuildtype=release \
+    -Ddefault_library=static \
+    -Dlibdvdcss=$(if [[ -n "$ENABLE_LIBDVDCSS" ]]; then echo enabled; else echo disabled; fi) && \
+  ninja -j$(nproc) -vC build install
+# musl has off64_t of the public headers only if this is defined before the first sys/types.h
+RUN sed -i 's/^Cflags: .*/& -D_LARGEFILE64_SOURCE/' /usr/local/lib/pkgconfig/dvdread.pc && \
+  echo "$LIBDVDREAD_VERSION" > /usr/local/share/versions/libdvdread
+
+# bump: libdvdnav /LIBDVDNAV_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/libdvdnav/last/|/libdvdnav-([\d.]+)\.tar\.xz/
+# bump: libdvdnav after ./hashupdate Dockerfile LIBDVDNAV $LATEST
+# bump: libdvdnav link "ChangeLog" https://code.videolan.org/videolan/libdvdnav/-/blob/master/ChangeLog
+ARG LIBDVDNAV_VERSION=7.0.0
+ARG LIBDVDNAV_URL="https://download.videolan.org/pub/videolan/libdvdnav/$LIBDVDNAV_VERSION/libdvdnav-$LIBDVDNAV_VERSION.tar.xz"
+ARG LIBDVDNAV_FILE="libdvdnav.$LIBDVDNAV_VERSION.tar.xz"
+ARG LIBDVDNAV_SHA256=a2a18f5ad36d133c74bf9106b6445806fa253b09141a46392550394b647b221e
+ADD --checksum=sha256:$LIBDVDNAV_SHA256 --unpack=true $LIBDVDNAV_URL /
+RUN \
+  cd libdvdnav-* && \
+  meson setup build \
+    -Dbuildtype=release \
+    -Ddefault_library=static && \
+  ninja -j$(nproc) -vC build install && \
+  echo "$LIBDVDNAV_VERSION" > /usr/local/share/versions/libdvdnav
 
 FROM base AS fdk-aac
 # bump: fdk-aac /FDK_AAC_VERSION=([\d.]+)/ https://github.com/mstorsjo/fdk-aac.git|*
@@ -1206,10 +1264,10 @@ FROM base AS libjxl
 # bump: lcms2 /LCMS2_VERSION=([\d.]+)/ https://github.com/mm2/Little-CMS.git|^2
 # bump: lcms2 after ./hashupdate Dockerfile LCMS2 $LATEST
 # bump: lcms2 link "Release" https://github.com/mm2/Little-CMS/releases/tag/lcms$LATEST
-ARG LCMS2_VERSION=2.19.1
+ARG LCMS2_VERSION=2.20
 ARG LCMS2_URL="https://github.com/mm2/Little-CMS/releases/download/lcms$LCMS2_VERSION/lcms2-$LCMS2_VERSION.tar.gz"
 ARG LCMS2_FILE="lcms2.$LCMS2_VERSION.tar.gz"
-ARG LCMS2_SHA256=bfc54f7bab59fbc921012014a8032e4cba4abd46db47d46b76416a8c0b2815c8
+ARG LCMS2_SHA256=18ff5504fa9cc8a2b1f3591180d90ead16c8a2ea78e530523b46eab70e1ca6b9
 ADD --checksum=sha256:$LCMS2_SHA256 --unpack=true $LCMS2_URL /
 RUN \
   cd lcms2-* && \
@@ -1345,6 +1403,7 @@ COPY --link --from=chromaprint /usr/local/ /usr/local/
 COPY --link --from=libass /usr/local/ /usr/local/
 COPY --link --from=libbluray /usr/local/ /usr/local/
 COPY --link --from=davs2 /usr/local/ /usr/local/
+COPY --link --from=libdvdnav /usr/local/ /usr/local/
 COPY --link --from=fdk-aac /usr/local/ /usr/local/
 COPY --link --from=libgme /usr/local/ /usr/local/
 COPY --link --from=libgsm /usr/local/ /usr/local/
@@ -1431,6 +1490,8 @@ RUN \
   --enable-libbluray \
   --enable-libdav1d \
   --enable-libdavs2 \
+  --enable-libdvdnav \
+  --enable-libdvdread \
   --enable-libfreetype \
   --enable-libfribidi \
   --enable-libgme \
