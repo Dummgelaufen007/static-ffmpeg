@@ -16,6 +16,8 @@ WARNING: failed to download with error: could not get https://www.cairographics.
 
 With this PR meson does not download pixman. It comes from an Alpine package named in `apk add`, so a problem with it shows up in the first step of the build, under the package's own name.
 
+As for glib in #860, the cairo step runs `meson setup` with `--wrap-mode=nodownload`: if a new cairo version needs a library that no installed package provides, the step fails instead of fetching it.
+
 ## Alpine packages
 
 Alpine ships pixman with a static archive. With the packages from the table installed, meson finds it and the build log has no "Downloading" line left ([build](https://github.com/wader/static-ffmpeg/actions/runs/41101956127/job/124220543899)).
