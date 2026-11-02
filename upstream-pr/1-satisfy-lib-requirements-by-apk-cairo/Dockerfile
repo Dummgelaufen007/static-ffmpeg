@@ -65,9 +65,6 @@ ARG LDFLAGS="-Wl,-z,relro,-z,now"
 # retry dns and some http codes that might be transient errors
 ARG WGET_OPTS="--tries=10 --connect-timeout=10 --retry-connrefused --retry-on-host-error --retry-on-http-error=429,500,502,503,504"
 
-# wget gives up on a failed tls handshake, curl retries every error
-ARG CURL_OPTS="--fail --location --retry 9 --retry-all-errors --connect-timeout 10"
-
 # --no-same-owner as we don't care about uid/gid even if we run as root. fixes invalid gid/uid issue.
 ARG TAR_OPTS="--no-same-owner --extract --file"
 
@@ -1220,7 +1217,7 @@ ARG FFMPEG_OAPV_SHA256=f773a85ec68f3b26e0b2ab3cddb7a304df5be8eb5c1887c9b627e23e7
 # more similar to glibc (2MB). This fixing segfault with libaom-av1 and libsvtav1 as they seems to pass
 # large things on the stack.
 RUN \
-  curl $CURL_OPTS -o ffmpeg.tar.bz2 "$FFMPEG_URL" && \
+  wget $WGET_OPTS -O ffmpeg.tar.bz2 "$FFMPEG_URL" && \
   echo "$FFMPEG_SHA256  ffmpeg.tar.bz2" | sha256sum -c - && \
   wget $WGET_OPTS -O ffmpeg-oapv.patch "$FFMPEG_OAPV_URL" && \
   echo "$FFMPEG_OAPV_SHA256  ffmpeg-oapv.patch" | sha256sum -c - && \
