@@ -1477,8 +1477,8 @@ RUN \
   --enable-libzmq \
   --enable-libzvbi \
   --enable-openssl \
-  || (cat ffbuild/config.log ; false) \
-  && make -j$(nproc) install
+  || (cat ffbuild/config.log ; false) && \
+  make -j$(nproc) install
 
 RUN \
   EXPAT_VERSION=$(pkg-config --modversion expat) \
