@@ -269,3 +269,16 @@ The same release in a smaller compression; the checksum changes with the file, t
 |---|---|---|
 | uavs3d | upstream pins commit `0e20d2c`, which is tag `1.2`; the fork fetches the GitHub tag archive of `1.2` instead of a git clone | [wader/static-ffmpeg 31c49aa Dockerfile#L771-L772](https://github.com/wader/static-ffmpeg/blob/31c49aa1938b4736bfd55f13bdada70cafc47017/Dockerfile#L771-L772), `git ls-remote https://github.com/uavs3/uavs3d.git refs/tags/1.2` |
 | x264 | `version.sh` counts the commits of `HEAD` and of `origin/master..HEAD`, so the source needs its whole history and `origin/master`; a shallow fetch breaks the version | [x264 b35605a version.sh#L10-L12](https://code.videolan.org/videolan/x264/-/blob/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/version.sh#L10-L12) |
+
+## Stack protector
+
+`Dockerfile` hardens with `-fstack-protector-all`, in the global `CFLAGS` and `CXXFLAGS` and again through ffmpeg's `--toolchain=hardened`. `-fstack-protector-strong` keeps the guard on every function with something on its stack that a buffer overflow can write and drops it on the others; ffmpeg gets faster where such functions sit in hot loops.
+
+| Point | Finding | Source |
+|---|---|---|
+| What the guard covers | `-all` puts a guard into every function. `-strong` puts it into functions that call `alloca`, have local array definitions or take the address of a local; a function without them has no stack object a linear overflow could run through to the return address | [gcc 15.2.0 invoke.texi#L18620-L18642](https://github.com/gcc-mirror/gcc/blob/releases/gcc-15.2.0/gcc/doc/invoke.texi#L18620-L18642) |
+| ffmpeg's own flag | `--toolchain=hardened` adds `-fstack-protector-all` behind the `CFLAGS` from the environment, so the ARG alone leaves ffmpeg at `-all`; `--extra-cflags` and `--extra-cxxflags` come after it, and gcc lets the last option win. `config.mak` of a configure run with both: `-fstack-protector-all … -fstack-protector-strong` in `CFLAGS` and `CXXFLAGS` | [FFmpeg n9.0.2 configure#L5006-L5012](https://github.com/FFmpeg/FFmpeg/blob/n9.0.2/configure#L5006-L5012), measured |
+| Change | `-fstack-protector-strong` in the ARGs `CFLAGS` and `CXXFLAGS`, and in ffmpeg's `--extra-cflags` and `--extra-cxxflags` | `Dockerfile.X` against `Dockerfile.3` |
+| Guards in the binary | `%fs:0x28` accesses: 181344 with `-all`, 55454 with `-strong` (−69.4 %); `ffmpeg` is ~2 % smaller | disassembly of both exports |
+| Hot functions | compiled with `-all` and with `-strong`: `interpolateBiLin` (vid.stab, called per pixel), `transformPlanar` (vid.stab) and `ff_hevc_deblocking_boundary_strengths` lose the guard; `hls_prediction_unit` keeps it (`&current_mv`), `ff_hevc_hls_filter` keeps both (inlined deblocking and SAO helpers with local arrays) | measured |
+| Speed | 31 jobs of `bench.sh`, 3 alternating runs, median wall time: vidstabtransform 12.305 s to 11.226 s (−8.8 %), job mp4 clean+sub 35.557 s to 33.306 s (−6.3 %), both far beyond the spread of the runs and matching the functions above. The other 29 jobs change by 1.9 % or less, apart from bwdif with −3.8 % at a spread of 7.2 % between its runs; every feature probe passes on both | measured on randyandy |
