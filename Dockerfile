@@ -42,7 +42,6 @@ RUN apk add --no-cache $APK_OPTS \
   cmake meson ninja \
   git \
   yasm nasm \
-  texinfo \
   jq \
   zlib-dev zlib-static \
   bzip2-dev bzip2-static \
@@ -53,24 +52,27 @@ RUN apk add --no-cache $APK_OPTS \
   libpng-dev libpng-static \
   fribidi-dev fribidi-static \
   brotli-dev brotli-static \
-  soxr-dev soxr-static \
-  numactl-dev \
   fftw-dev fftw-static \
-  libsamplerate-dev libsamplerate-static \
-  vo-amrwbenc-dev vo-amrwbenc-static \
-  snappy snappy-dev snappy-static \
-  # replace the pixman download of cairo
-  pixman-dev pixman-static \
-  xxd \
   xz-dev xz-static \
+  # needed by vmaf
+  xxd \
   # needed by glib
   python3 py3-packaging \
-  # needed by rtmpdump
-  linux-headers \
-  # replace the pcre2 and libffi downloads of glib
   pcre2-dev pcre2-static libffi-dev \
-  # replaces the proxy-libintl download of glib
-  musl-libintl
+  musl-libintl \
+  # needed by cairo
+  pixman-dev pixman-static \
+  # needed by librtmp
+  linux-headers \
+  # needed by rubberband
+  libsamplerate-dev libsamplerate-static \
+  # needed by x265
+  numactl-dev \
+  # needed by ffmpeg
+  texinfo \
+  soxr-dev soxr-static \
+  vo-amrwbenc-dev vo-amrwbenc-static \
+  snappy snappy-dev snappy-static
 
 # -O3 makes sure we compile with optimization. setting CFLAGS/CXXFLAGS seems to override
 # default automake cflags.
