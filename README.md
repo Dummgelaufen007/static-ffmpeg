@@ -5,6 +5,14 @@
 > developed independently. Changes that fit upstream are sent there as pull requests.
 >
 > - The fork's work lives in `Dockerfile` and its `Dockerfile.*` variants, listed in [naming.md](naming.md).
+> - `Dockerfile` adds [libzvbi](https://github.com/zapping-vbi/zvbi) and
+>   [libopenmpt](https://lib.openmpt.org/libopenmpt/) to the libraries listed below.
+> - Enhancements:
+>   - Unicode line breaking for libass subtitles
+>   - fixed ARIB caption decoding
+>   - alpha and HDR10+ in x265
+>   - `tune=vmaf` in libaom without a model file
+>   - faster AVS2 decoding and encoding
 > - The fork publishes no image. `mwader/static-ffmpeg` below is upstream's image.
 > - For a variant with a downloader stage, fill the source cache first with
 >   `./download.sh Dockerfile.<n>`.
@@ -47,6 +55,7 @@ alias ffprobe='docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" --ent
 
 ### Libraries
 
+- [chromaprint](https://github.com/acoustid/chromaprint)
 - [fontconfig](https://www.freedesktop.org/wiki/Software/fontconfig/)
 - gray (full grayscale support)
 - iconv (from musl)
@@ -57,6 +66,9 @@ alias ffprobe='docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" --ent
 - [libbluray](https://www.videolan.org/developers/libbluray.html)
 - [libdav1d](https://code.videolan.org/videolan/dav1d)
 - [libdavs2](https://github.com/pkuvcl/davs2)
+- [libdvdcss](https://code.videolan.org/videolan/libdvdcss) (only if explicitly enabled during build, [see below](#libdvdcss))
+- [libdvdnav](https://code.videolan.org/videolan/libdvdnav)
+- [libdvdread](https://code.videolan.org/videolan/libdvdread)
 - [libfdk-aac](https://github.com/mstorsjo/fdk-aac) (only if explicitly enabled during build, [see below](#libfdk-aac))
 - [libfreetype](https://freetype.org/)
 - [libfribidi](https://github.com/fribidi/fribidi)
@@ -68,6 +80,7 @@ alias ffprobe='docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" --ent
 - [libmodplug](https://github.com/Konstanty/libmodplug)
 - [libmp3lame](https://lame.sourceforge.io/)
 - [libmysofa](https://github.com/hoene/libmysofa)
+- [liboapv](https://github.com/AcademySoftwareFoundation/openapv)
 - [libopencore](https://sourceforge.net/projects/opencore-amr/)
 - [libopenjpeg](https://www.openjpeg.org)
 - [libopus](https://opus-codec.org)
@@ -130,6 +143,12 @@ alias ffprobe='docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" --ent
 Binaries are built with various hardening features but it's *still a good idea to run them
 as non-root even when used inside a container*, especially so if running on input files that
 you don't control.
+
+### libdvdcss
+Due to legal questions the docker image does not include libdvdcss by default, so ffmpeg reads unencrypted DVDs only. A docker image that also reads CSS-encrypted DVDs can be built by passing a non empty value to the build-arg `ENABLE_LIBDVDCSS`, example below.
+```
+docker build --build-arg ENABLE_LIBDVDCSS=1 . -t my-ffmpeg-static:latest
+```
 
 ### libfdk-aac
 Due to license issues the docker image does not include libfdk-aac by default. A docker image including libfdk-aac can be built by passing a non empty value to the build-arg `ENABLE_FDKAAC`, example below.
@@ -308,7 +327,5 @@ usage and potential distribution of such.
 
 ### TODOs and possible things to add
 
-- Add libopenapv
-- Add chromaprint, etc. ...
 - Add *.a *.so libraries, headers and pkg-config somehow
 
