@@ -14,7 +14,7 @@ This PR adds `# syntax=docker/dockerfile:1` as first line, so BuildKit fetches t
 
 ## What changes in the Dockerfile
 
-**Archives.** `wget`, `sha256sum` and `tar` become one line; libaribb24 now enters `aribb24-*`, the directory inside its archive.
+**Archives.** `curl`, `sha256sum` and `tar` become one line; libaribb24 now enters `aribb24-*`, the directory inside its archive.
 
 ```dockerfile
 ADD --checksum=sha256:$VMAF_SHA256 --unpack=true $VMAF_URL /
@@ -39,11 +39,11 @@ RUN \
 
 **libmodplug and opencore-amr** now use the same sourceforge link form as lame (`.../download`), which `ADD` fetches reliably.
 
-**Other lines.** `wget`, `WGET_OPTS` and `TAR_OPTS` go; `curl`, `tar` and `git` stay for libjxl `deps.sh`, x264 and uavs3d.
+**Other lines.** `CURL_OPTS` and `TAR_OPTS` go; `curl`, `tar` and `git` stay for libjxl `deps.sh`, x264 and uavs3d.
 
 ## What is given up
 
-- BuildKit does not retry a failed download, where `wget` did.
+- BuildKit does not retry a failed download, where `curl` does.
 - fdk-aac is always downloaded, even without `ENABLE_FDKAAC`.
 
 ## Docker version

@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# wget reads only the lower-case name
+# curl reads only the lower-case name
 [[ -z ${HTTP_PROXY:-} ]] || export http_proxy="$HTTP_PROXY"
 
 dockerfile="${1:-Dockerfile}"
@@ -28,7 +28,7 @@ mkdir -p "$dl_dir"
 fetch_file() {
   local url=$1 file=$dl_dir/$2 sha=$3
   if ! echo "$sha  $file" | sha256sum -c - >/dev/null 2>&1; then
-    wget -O "$file.tmp" -q --show-progress $WGET_OPTS "$url"
+    curl $CURL_OPTS -o "$file.tmp" "$url"
     echo "$sha  $file.tmp" | sha256sum -c -
     mv "$file.tmp" "$file"
   fi

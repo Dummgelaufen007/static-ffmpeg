@@ -10,7 +10,7 @@ FROM scratch AS downloads
 
 FROM alpine AS downloader
 ARG APK_OPTS=""
-RUN apk add --no-cache $APK_OPTS bash wget git
+RUN apk add --no-cache $APK_OPTS bash curl git
 COPY --from=downloads / /downloads/
 ARG DOCKERFILE=Dockerfile
 ARG ENABLE_FDKAAC=
@@ -104,8 +104,8 @@ ARG CFLAGS="-O3 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
 ARG CXXFLAGS="-O3 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
 ARG LDFLAGS="-Wl,-z,relro,-z,now"
 
-# retry dns and some http codes that might be transient errors
-ARG WGET_OPTS="--tries=10 --connect-timeout=10 --retry-connrefused --retry-on-host-error --retry-on-http-error=429,500,502,503,504"
+# retry every error, also a failed tls handshake, which wget does not retry
+ARG CURL_OPTS="--fail --location --retry 9 --retry-all-errors --connect-timeout 10"
 
 # before aom as libvmaf uses it
 # bump: vmaf /VMAF_VERSION=([\d.]+)/ https://github.com/Netflix/vmaf.git|*
@@ -141,7 +141,9 @@ ARG GLIB_FILE="glib.$GLIB_VERSION.tar.xz"
 ARG GLIB_SHA256=93c941aa17d5eb1d53fe838365f29a8b4e539c222a256d974ec8f30fc413e396
 RUN \
   cd glib-* && \
+  # fail instead of downloading a dependency that no apk package provides
   meson setup build \
+    --wrap-mode=nodownload \
     -Dbuildtype=release \
     -Ddefault_library=static \
     -Dtests=false \
@@ -184,7 +186,9 @@ ARG CAIRO_FILE="cairo.$CAIRO_VERSION.tar.xz"
 ARG CAIRO_SHA256=1c767308174337a74694da0f3ec069c271452163a1ef4540964c50c301f157d4
 RUN \
   cd cairo-* && \
+  # fail instead of downloading a dependency that no apk package provides
   meson setup build \
+    --wrap-mode=nodownload \
     -Dbuildtype=release \
     -Ddefault_library=static \
     -Dtests=disabled \

@@ -98,7 +98,9 @@ ARG GLIB_SHA256=93c941aa17d5eb1d53fe838365f29a8b4e539c222a256d974ec8f30fc413e396
 ADD --checksum=sha256:$GLIB_SHA256 --unpack=true $GLIB_URL /
 RUN \
   cd glib-* && \
+  # fail instead of downloading a dependency that no apk package provides
   meson setup build \
+    --wrap-mode=nodownload \
     -Dbuildtype=release \
     -Ddefault_library=static \
     -Dtests=false \
@@ -143,7 +145,9 @@ ARG CAIRO_SHA256=1c767308174337a74694da0f3ec069c271452163a1ef4540964c50c301f157d
 ADD --checksum=sha256:$CAIRO_SHA256 --unpack=true $CAIRO_URL /
 RUN \
   cd cairo-* && \
+  # fail instead of downloading a dependency that no apk package provides
   meson setup build \
+    --wrap-mode=nodownload \
     -Dbuildtype=release \
     -Ddefault_library=static \
     -Dtests=disabled \
