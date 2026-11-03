@@ -1,6 +1,11 @@
 # bump: alpine /ALPINE_VERSION=alpine:([\d.]+)/ docker:alpine|^3
 # bump: alpine link "Release notes" https://alpinelinux.org/posts/Alpine-$LATEST-released.html
 ARG ALPINE_VERSION=alpine:3.24.3
+# retry every error, also a failed tls handshake, which wget does not retry
+ARG CURL_OPTS="--fail --location --retry 9 --retry-all-errors --connect-timeout 10"
+# --no-same-owner as we don't care about uid/gid even if we run as root. fixes invalid gid/uid issue.
+ARG TAR_OPTS="--no-same-owner --extract --file"
+
 # autoreconf needs gettext-dev, whose libintl.h redirects gettext to libintl_ symbols; kept out of the builder so no other recipe compiles against it
 FROM $ALPINE_VERSION AS zvbi
 ARG APK_OPTS=""
@@ -12,9 +17,8 @@ ARG ZVBI_VERSION=0.2.45
 ARG ZVBI_URL="https://github.com/zapping-vbi/zvbi/archive/refs/tags/v$ZVBI_VERSION.tar.gz"
 ARG ZVBI_FILE="zvbi.$ZVBI_VERSION.tar.gz"
 ARG ZVBI_SHA256=e6c954fde2a5a635187f19e1ab870a88c1a982012c5f1b33b8f2513e0ab7a50e
-ARG CURL_OPTS="--fail --location --retry 9 --retry-all-errors --connect-timeout 10"
-# --no-same-owner as we don't care about uid/gid even if we run as root. fixes invalid gid/uid issue.
-ARG TAR_OPTS="--no-same-owner --extract --file"
+ARG CURL_OPTS
+ARG TAR_OPTS
 RUN \
   curl $CURL_OPTS -o $ZVBI_FILE "$ZVBI_URL" && \
   echo "$ZVBI_SHA256  $ZVBI_FILE" | sha256sum -c - && \
@@ -83,11 +87,8 @@ ARG CFLAGS="-O3 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
 ARG CXXFLAGS="-O3 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
 ARG LDFLAGS="-Wl,-z,relro,-z,now"
 
-# retry every error, also a failed tls handshake, which wget does not retry
-ARG CURL_OPTS="--fail --location --retry 9 --retry-all-errors --connect-timeout 10"
-
-# --no-same-owner as we don't care about uid/gid even if we run as root. fixes invalid gid/uid issue.
-ARG TAR_OPTS="--no-same-owner --extract --file"
+ARG CURL_OPTS
+ARG TAR_OPTS
 
 # before aom as libvmaf uses it
 # bump: vmaf /VMAF_VERSION=([\d.]+)/ https://github.com/Netflix/vmaf.git|*
