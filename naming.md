@@ -7,3 +7,4 @@
 | `Dockerfile.1` | `Dockerfile`      | sources fetched with `ADD`                                              |
 | `Dockerfile.2` | `Dockerfile.1`    | `runbook-to-parallelizing.md`                                           |
 | `Dockerfile.3` | `Dockerfile`      | `runbook-for-caching.md`                                                |
+| `Dockerfile.4` | `Dockerfile.2`    | `-O2` instead of `-O3` in every recipe                                  |
