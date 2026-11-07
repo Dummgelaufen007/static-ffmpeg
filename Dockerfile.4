@@ -80,6 +80,7 @@ RUN apk add --no-cache $APK_OPTS \
 ARG CFLAGS="-O2 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
 ARG CXXFLAGS="-O2 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
 ARG LDFLAGS="-Wl,-z,relro,-z,now"
+ARG CMAKE_RELEASE_FLAGS="-DCMAKE_C_FLAGS_RELEASE=-DNDEBUG -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG"
 ENV CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS"
 RUN mkdir -p /usr/local/share/versions
 
@@ -131,8 +132,7 @@ RUN \
     -G"Unix Makefiles" \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     -DBUILD_SHARED_LIBS=OFF \
     -DENABLE_APPS=NO \
     -DENABLE_EXAMPLES=NO \
@@ -194,8 +194,7 @@ RUN \
     -G"Unix Makefiles" \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DBUILD_SHARED_LIBS=OFF \
     -DBUILD_TESTS=OFF \
@@ -528,8 +527,7 @@ RUN \
     -G"Unix Makefiles" \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     -DBUILD_SHARED_LIBS=OFF \
     -DENABLE_UBSAN=OFF \
     .. && \
@@ -633,8 +631,7 @@ RUN \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DBUILD_SHARED_LIBS=OFF \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     -DBUILD_TESTS=OFF \
     .. && \
   make -j$(nproc) install && \
@@ -692,8 +689,7 @@ RUN \
     -G"Unix Makefiles" \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     -DBUILD_SHARED_LIBS=OFF \
     -DBUILD_CODEC=OFF \
     -DWITH_ASTYLE=OFF \
@@ -743,8 +739,7 @@ RUN \
     -DCMAKE_INSTALL_PREFIX=/usr/local \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     -DBUILD_TESTING=OFF \
     -DENABLE_SSL_SUPPORT=OFF \
     -DBUILD_TOOLS=OFF \
@@ -863,8 +858,7 @@ RUN \
     -G"Unix Makefiles" \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     -DENABLE_SHARED=OFF \
     -DENABLE_APPS=OFF \
     -DENABLE_CXX11=ON \
@@ -898,8 +892,7 @@ RUN \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     -DBUILD_SHARED_LIBS=OFF \
     -DWITH_GSSAPI=OFF \
     -DWITH_BLOWFISH_CIPHER=ON \
@@ -939,8 +932,7 @@ RUN \
     -DSVT_AV1_LTO=OFF \
     -DENABLE_AVX512=ON \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     .. && \
   make -j$(nproc) install && \
   echo "$SVTAV1_VERSION" > /usr/local/share/versions/libsvtav1
@@ -1065,8 +1057,7 @@ RUN \
     -G"Unix Makefiles" \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     -DBUILD_SHARED_LIBS=OFF \
     -DCOMPILE_10BIT=1 \
     ../.. && \
@@ -1093,8 +1084,7 @@ RUN \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_SYSTEM_ARCH=$(arch) \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     -DBUILD_SHARED_LIBS=OFF \
     -DUSE_OMP=ON \
     .. && \
@@ -1190,7 +1180,7 @@ RUN \
   sed -i 's/-DHIGH_BIT_DEPTH=ON/& -DENABLE_HDR10_PLUS=ON/' ./multilib.sh && \
   sed -i '1i #include <cstdint>' ../../source/dynamicHDR10/json11/json11.cpp && \
   MAKEFLAGS="-j$(nproc)" \
-  CMAKEFLAGS="-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DENABLE_ALPHA=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG" \
+  CMAKEFLAGS="-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DENABLE_ALPHA=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release $CMAKE_RELEASE_FLAGS" \
   ./multilib.sh && \
   make -C 8bit -j$(nproc) install && \
   echo "$X265_VERSION" > /usr/local/share/versions/libx265
@@ -1253,8 +1243,7 @@ RUN \
     -G"Unix Makefiles" \
     -DARM="$(if [ $(uname -m) == aarch64 ]; then echo TRUE; else echo FALSE; fi)" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     .. && \
   make -j$(nproc) install && \
   echo "$XEVE_VERSION" > /usr/local/share/versions/libxeve
@@ -1277,8 +1266,7 @@ RUN \
     -G"Unix Makefiles" \
     -DARM="$(if [ $(uname -m) == aarch64 ]; then echo TRUE; else echo FALSE; fi)" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     .. && \
   make -j$(nproc) install && \
   echo "$XEVD_VERSION" > /usr/local/share/versions/libxevd
@@ -1338,8 +1326,7 @@ RUN \
   cmake -B build \
     -G"Unix Makefiles" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     -DHWY_ENABLE_CONTRIB=OFF \
     -DHWY_ENABLE_EXAMPLES=OFF \
     -DHWY_ENABLE_TESTS=OFF && \
@@ -1357,8 +1344,7 @@ RUN \
   cmake -B build \
     -G"Unix Makefiles" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_INSTALL_PREFIX=/usr/local \
@@ -1426,8 +1412,7 @@ RUN \
     -DVVENC_LIBRARY_ONLY=ON \
     -DVVENC_ENABLE_LINK_TIME_OPT=OFF \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
-    -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
+    $CMAKE_RELEASE_FLAGS \
     -DCMAKE_INSTALL_PREFIX=/usr/local && \
   cmake --build build/release-static -j$(nproc) && \
   cmake --build build/release-static --target install && \
