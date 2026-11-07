@@ -1448,6 +1448,7 @@ ADD --checksum=sha256:$FFMPEG_OAPV_SHA256 $FFMPEG_OAPV_URL /$FFMPEG_OAPV_FILE
 RUN \
   cd ffmpeg-* && \
   git apply ../$FFMPEG_OAPV_FILE && \
+  echo 'libavcodec/me_cmp.o: CFLAGS += -fno-tree-vectorize' >> libavcodec/Makefile && \
   FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-nonfree " ;else echo ""; fi) && \
   sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
   ./configure \
