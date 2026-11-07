@@ -10,6 +10,7 @@ With this PR the four options every CMake recipe needs come from one `ARG CMAKE_
 
 | File | Change |
 |---|---|
-| `Dockerfile` | new `ARG CMAKE_COMMON_FLAGS`; aom, chromaprint, libgme, libmysofa, openapv, openjpeg, rabbitmq-c, srt, libssh, svtav1, uavs3d, vid.stab, x265, xeve, xevd, highway, libjxl and vvenc use it instead of their own copies; `-G"Unix Makefiles"` removed, it is CMake's default on Linux |
+| `Dockerfile` | new `ARG CMAKE_COMMON_FLAGS`, used by every CMake recipe; `-G"Unix Makefiles"` removed, it is CMake's default on Linux |
+| `Dockerfile` | x265: the `multilib.sh` sed appends only `${CMAKEFLAGS}`, without `-G "Unix Makefiles"` |
 
 *Research and wording by Claude (Anthropic), directed and reviewed by me.*

@@ -982,7 +982,7 @@ RUN \
   curl $CURL_OPTS -o x265.tar.gz "$X265_URL" && \
   echo "$X265_SHA256  x265.tar.gz" | sha256sum -c - && \
   tar $TAR_OPTS x265.tar.gz && cd x265_*/build/linux && \
-  sed -i '/^cmake / s/$/ -G "Unix Makefiles" ${CMAKEFLAGS}/' ./multilib.sh && \
+  sed -i '/^cmake / s/$/ ${CMAKEFLAGS}/' ./multilib.sh && \
   sed -i 's/ -DENABLE_SHARED=OFF//g' ./multilib.sh && \
   MAKEFLAGS="-j$(nproc)" \
   CMAKEFLAGS="-DENABLE_SHARED=OFF -DENABLE_CLI=OFF $CMAKE_COMMON_FLAGS" \
