@@ -1224,7 +1224,7 @@ RUN \
   make -j$(nproc) install
 
 # ffmpeg only decodes, so no capture interfaces and no png page export
-COPY --from=zvbi /zvbi/ /zvbi/
+COPY --link --from=zvbi /zvbi/ /zvbi/
 RUN \
   cd zvbi && \
   ac_cv_lib_png_png_destroy_write_struct=no \
@@ -1480,15 +1480,15 @@ RUN \
 RUN apk add $APK_OPTS font-terminus font-inconsolata font-dejavu font-awesome
 
 FROM scratch AS final1
-COPY --from=builder /usr/local/bin/ffmpeg /
-COPY --from=builder /usr/local/bin/ffprobe /
-COPY --from=builder /versions.json /
-COPY --from=builder /usr/local/share/doc/ffmpeg/* /doc/
-COPY --from=builder /etc/ssl/cert.pem /etc/ssl/cert.pem
-COPY --from=builder /etc/fonts/ /etc/fonts/
-COPY --from=builder /usr/share/fonts/ /usr/share/fonts/
-COPY --from=builder /usr/share/consolefonts/ /usr/share/consolefonts/
-COPY --from=builder /var/cache/fontconfig/ /var/cache/fontconfig/
+COPY --link --from=builder /usr/local/bin/ffmpeg /
+COPY --link --from=builder /usr/local/bin/ffprobe /
+COPY --link --from=builder /versions.json /
+COPY --link --from=builder /usr/local/share/doc/ffmpeg/* /doc/
+COPY --link --from=builder /etc/ssl/cert.pem /etc/ssl/cert.pem
+COPY --link --from=builder /etc/fonts/ /etc/fonts/
+COPY --link --from=builder /usr/share/fonts/ /usr/share/fonts/
+COPY --link --from=builder /usr/share/consolefonts/ /usr/share/consolefonts/
+COPY --link --from=builder /var/cache/fontconfig/ /var/cache/fontconfig/
 
 # sanity tests
 RUN ["/ffmpeg", "-version"]
@@ -1509,7 +1509,7 @@ RUN ["/ffmpeg", "-f", "lavfi", "-i", "testsrc", "-c:v", "libx265", "-t", "100ms"
 
 # clamp all files into one layer
 FROM scratch AS final2
-COPY --from=final1 / /
+COPY --link --from=final1 / /
 
 FROM final2
 LABEL maintainer="Mattias Wadman mattias.wadman@gmail.com"
