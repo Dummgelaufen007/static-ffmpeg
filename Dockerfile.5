@@ -216,7 +216,8 @@ RUN --mount=from=downloader,src=/downloads/$CHROMAPRINT_FILE,dst=/$CHROMAPRINT_F
   echo "Libs.private: -lfftw3 -lstdc++" >> /usr/local/lib/pkgconfig/libchromaprint.pc && \
   echo "$CHROMAPRINT_VERSION" > /usr/local/share/versions/chromaprint
 
-FROM base AS glib
+# hard: pango needs glib, harfbuzz and cairo; librsvg needs rust, pango and, for -Davif=enabled, dav1d; libass needs harfbuzz, which is not an apk package, and, for --enable-libunibreak, libunibreak
+FROM rust AS libass
 # own build as alpine glib links with libmount etc
 # bump: glib /GLIB_VERSION=([\d.]+)/ https://gitlab.gnome.org/GNOME/glib.git|^2
 # bump: glib after ./hashupdate Dockerfile GLIB $LATEST
@@ -243,8 +244,6 @@ RUN --mount=from=downloader,src=/downloads/$GLIB_FILE,dst=/$GLIB_FILE \
 # exported symbols keep rust thread locals as unresolved relocations that a static pie never applies
   sed -i 's/-Wl,--export-dynamic//' /usr/local/lib/pkgconfig/gmodule-2.0.pc /usr/local/lib/pkgconfig/gmodule-export-2.0.pc
 
-# glib is optional (auto) for harfbuzz, kept before it for identical output
-FROM glib AS harfbuzz
 # bump: harfbuzz /LIBHARFBUZZ_VERSION=([\d.]+)/ https://github.com/harfbuzz/harfbuzz.git|*
 # bump: harfbuzz after ./hashupdate Dockerfile LIBHARFBUZZ $LATEST
 # bump: harfbuzz link "NEWS" https://github.com/harfbuzz/harfbuzz/blob/main/NEWS
@@ -268,8 +267,6 @@ RUN --mount=from=downloader,src=/downloads/$LIBHARFBUZZ_FILE,dst=/$LIBHARFBUZZ_F
   ninja -j$(nproc) -l$(nproc) -vC build install && \
   echo "$LIBHARFBUZZ_VERSION" > /usr/local/share/versions/libharfbuzz
 
-# hard: librsvg needs cairo-gobject, which cairo builds only with glib
-FROM glib AS cairo
 # bump: cairo /CAIRO_VERSION=([\d.]+)/ https://gitlab.freedesktop.org/cairo/cairo.git|^1
 # bump: cairo after ./hashupdate Dockerfile CAIRO $LATEST
 # bump: cairo link "NEWS" https://gitlab.freedesktop.org/cairo/cairo/-/blob/master/NEWS?ref_type=heads
@@ -293,9 +290,6 @@ RUN --mount=from=downloader,src=/downloads/$CAIRO_FILE,dst=/$CAIRO_FILE \
     -Dxlib-xcb=disabled && \
   ninja -j$(nproc) -l$(nproc) -vC build install
 
-# hard: pango needs glib, harfbuzz and cairo
-FROM harfbuzz AS pango
-COPY --link --from=cairo /usr/local/ /usr/local/
 # TODO: there is weird "1.90" tag, skip it
 # bump: pango /PANGO_VERSION=([\d.]+)/ https://github.com/GNOME/pango.git|/\d+\.\d+\.\d+/|*
 # bump: pango after ./hashupdate Dockerfile PANGO $LATEST
@@ -316,7 +310,6 @@ RUN --mount=from=downloader,src=/downloads/$PANGO_FILE,dst=/$PANGO_FILE \
     -Dgtk_doc=false && \
   ninja -j$(nproc) -l$(nproc) -vC build install
 
-FROM base AS dav1d
 # bump: dav1d /DAV1D_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/dav1d/last/|/dav1d-([\d.]+)\.tar\.xz/
 # bump: dav1d after ./hashupdate Dockerfile DAV1D $LATEST
 # bump: dav1d link "Release notes" https://code.videolan.org/videolan/dav1d/-/tags/$LATEST
@@ -335,10 +328,6 @@ RUN --mount=from=downloader,src=/downloads/$DAV1D_FILE,dst=/$DAV1D_FILE \
   ninja -j$(nproc) -l$(nproc) -vC build install && \
   echo "$DAV1D_VERSION" > /usr/local/share/versions/libdav1d
 
-# hard: librsvg needs rust, pango and, for -Davif=enabled, dav1d
-FROM rust AS librsvg
-COPY --link --from=pango /usr/local/ /usr/local/
-COPY --link --from=dav1d /usr/local/ /usr/local/
 # bump: librsvg /LIBRSVG_VERSION=([\d.]+)/ https://gitlab.gnome.org/GNOME/librsvg.git|^2
 # bump: librsvg after ./hashupdate Dockerfile LIBRSVG $LATEST
 # bump: librsvg link "NEWS" https://gitlab.gnome.org/GNOME/librsvg/-/blob/master/NEWS
@@ -365,7 +354,6 @@ RUN --mount=from=downloader,src=/downloads/$LIBRSVG_FILE,dst=/$LIBRSVG_FILE --mo
   ninja -j$(nproc) -l$(nproc) -vC build install && \
   echo "$LIBRSVG_VERSION" > /usr/local/share/versions/librsvg
 
-FROM base AS libunibreak
 # bump: libunibreak /LIBUNIBREAK_VERSION=([\d.]+)/ gitrefs:https://github.com/adah1972/libunibreak.git|re:#^refs/tags/libunibreak_(\d+)_(\d+)$#${1}.${2}#|*
 # bump: libunibreak after sed -i -E "s#/libunibreak_[0-9_]+/#/libunibreak_$(echo $LATEST | tr . _)/#" Dockerfile && ./hashupdate Dockerfile LIBUNIBREAK $LATEST
 # bump: libunibreak link "NEWS" https://github.com/adah1972/libunibreak/blob/master/NEWS
@@ -382,9 +370,6 @@ RUN --mount=from=downloader,src=/downloads/$LIBUNIBREAK_FILE,dst=/$LIBUNIBREAK_F
   make -j$(nproc) -l$(nproc) install && \
   echo "$LIBUNIBREAK_VERSION" > /usr/local/share/versions/libunibreak
 
-# hard: libass needs harfbuzz, which is not an apk package, and, for --enable-libunibreak, libunibreak
-FROM harfbuzz AS libass
-COPY --link --from=libunibreak /usr/local/ /usr/local/
 # bump: libass /LIBASS_VERSION=([\d.]+)/ https://github.com/libass/libass.git|*
 # bump: libass after ./hashupdate Dockerfile LIBASS $LATEST
 # bump: libass link "Release notes" https://github.com/libass/libass/releases/tag/$LATEST
@@ -931,7 +916,8 @@ RUN --mount=from=downloader,src=/downloads/$SVTAV1_FILE,dst=/$SVTAV1_FILE \
   make -j$(nproc) -l$(nproc) install && \
   echo "$SVTAV1_VERSION" > /usr/local/share/versions/libsvtav1
 
-FROM base AS ogg
+# hard: theora and vorbis need ogg; libopenmpt picks up ogg and vorbis, kept after them for identical output
+FROM base AS vorbis
 # bump: ogg /OGG_VERSION=([\d.]+)/ https://github.com/xiph/ogg.git|*
 # bump: ogg after ./hashupdate Dockerfile OGG $LATEST
 # bump: ogg link "CHANGES" https://github.com/xiph/ogg/blob/master/CHANGES
@@ -949,8 +935,6 @@ RUN --mount=from=downloader,src=/downloads/$OGG_FILE,dst=/$OGG_FILE \
   make -j$(nproc) -l$(nproc) install && \
   echo "$OGG_VERSION" > /usr/local/share/versions/libogg
 
-# hard: theora needs ogg
-FROM ogg AS theora
 # bump: theora /THEORA_VERSION=([\d.]+)/ https://github.com/xiph/theora.git|*
 # bump: theora after ./hashupdate Dockerfile THEORA $LATEST
 # bump: theora link "Release notes" https://github.com/xiph/theora/releases/tag/v$LATEST
@@ -973,8 +957,6 @@ RUN --mount=from=downloader,src=/downloads/$THEORA_FILE,dst=/$THEORA_FILE \
   make -j$(nproc) -l$(nproc) install && \
   echo "$THEORA_VERSION" > /usr/local/share/versions/libtheora
 
-# hard: vorbis needs ogg; libopenmpt picks up ogg and vorbis, kept after them for identical output
-FROM ogg AS vorbis
 # bump: vorbis /VORBIS_VERSION=([\d.]+)/ https://github.com/xiph/vorbis.git|*
 # bump: vorbis after ./hashupdate Dockerfile VORBIS $LATEST
 # bump: vorbis link "CHANGES" https://github.com/xiph/vorbis/blob/master/CHANGES
@@ -1271,7 +1253,8 @@ RUN --mount=from=downloader,src=/downloads/$ZIMG_FILE,dst=/$ZIMG_FILE \
   make -j$(nproc) -l$(nproc) install && \
   echo "$ZIMG_VERSION" > /usr/local/share/versions/libzimg
 
-FROM base AS lcms2
+# hard: -DJPEGXL_FORCE_SYSTEM_HWY=ON needs highway, -DJPEGXL_ENABLE_SKCMS=OFF needs lcms2
+FROM base AS libjxl
 # bump: lcms2 /LCMS2_VERSION=([\d.]+)/ https://github.com/mm2/Little-CMS.git|^2
 # bump: lcms2 after ./hashupdate Dockerfile LCMS2 $LATEST
 # bump: lcms2 link "Release" https://github.com/mm2/Little-CMS/releases/tag/lcms$LATEST
@@ -1291,7 +1274,10 @@ RUN --mount=from=downloader,src=/downloads/$LCMS2_FILE,dst=/$LCMS2_FILE \
   make -j$(nproc) -l$(nproc) install && \
   echo "$LCMS2_VERSION" > /usr/local/share/versions/lcms2
 
-FROM base AS highway
+# bump: libjxl /LIBJXL_VERSION=([\d.]+)/ https://github.com/libjxl/libjxl.git|^0
+# bump: libjxl after ./hashupdate Dockerfile LIBJXL $LATEST
+# bump: libjxl after HWY=$(curl -sL https://raw.githubusercontent.com/libjxl/libjxl/v$LATEST/deps.sh | sed -n 's/^THIRD_PARTY_HIGHWAY="\([0-9a-f]*\)".*/\1/p') && V=$(git ls-remote --tags https://github.com/google/highway | awk -v c=$HWY '$1==c {sub("refs/tags/","",$2); sub("\\^\\{\\}","",$2); print $2}') && sed -i -E "s/^ARG HIGHWAY_VERSION=.*/ARG HIGHWAY_VERSION=$V/" Dockerfile && ./hashupdate Dockerfile HIGHWAY $V
+# bump: libjxl link "Changelog" https://github.com/libjxl/libjxl/blob/main/CHANGELOG.md
 # highway is the only third_party source of libjxl this build uses, pinned by libjxl deps.sh and bumped with libjxl
 # highway is built here as its static build is not available in alpine
 ARG HIGHWAY_VERSION=1.2.0
@@ -1309,13 +1295,6 @@ RUN --mount=from=downloader,src=/downloads/$HIGHWAY_FILE,dst=/$HIGHWAY_FILE \
   cmake --build build -j$(nproc) -- -l$(nproc) && \
   cmake --install build
 
-# hard: -DJPEGXL_FORCE_SYSTEM_HWY=ON needs highway, -DJPEGXL_ENABLE_SKCMS=OFF needs lcms2
-FROM highway AS libjxl
-COPY --link --from=lcms2 /usr/local/ /usr/local/
-# bump: libjxl /LIBJXL_VERSION=([\d.]+)/ https://github.com/libjxl/libjxl.git|^0
-# bump: libjxl after ./hashupdate Dockerfile LIBJXL $LATEST
-# bump: libjxl after HWY=$(curl -sL https://raw.githubusercontent.com/libjxl/libjxl/v$LATEST/deps.sh | sed -n 's/^THIRD_PARTY_HIGHWAY="\([0-9a-f]*\)".*/\1/p') && V=$(git ls-remote --tags https://github.com/google/highway | awk -v c=$HWY '$1==c {sub("refs/tags/","",$2); sub("\\^\\{\\}","",$2); print $2}') && sed -i -E "s/^ARG HIGHWAY_VERSION=.*/ARG HIGHWAY_VERSION=$V/" Dockerfile && ./hashupdate Dockerfile HIGHWAY $V
-# bump: libjxl link "Changelog" https://github.com/libjxl/libjxl/blob/main/CHANGELOG.md
 ARG LIBJXL_VERSION=0.12.0
 ARG LIBJXL_URL="https://github.com/libjxl/libjxl/archive/refs/tags/v${LIBJXL_VERSION}.tar.gz"
 ARG LIBJXL_FILE="libjxl.$LIBJXL_VERSION.tar.gz"
@@ -1418,7 +1397,6 @@ COPY --link --from=aom /usr/local/ /usr/local/
 COPY --link --from=libaribb24 /usr/local/ /usr/local/
 COPY --link --from=chromaprint /usr/local/ /usr/local/
 COPY --link --from=libass /usr/local/ /usr/local/
-COPY --link --from=librsvg /usr/local/ /usr/local/
 COPY --link --from=libbluray /usr/local/ /usr/local/
 COPY --link --from=davs2 /usr/local/ /usr/local/
 COPY --link --from=libdvdnav /usr/local/ /usr/local/
@@ -1442,7 +1420,6 @@ COPY --link --from=speex /usr/local/ /usr/local/
 COPY --link --from=srt /usr/local/ /usr/local/
 COPY --link --from=libssh /usr/local/ /usr/local/
 COPY --link --from=svtav1 /usr/local/ /usr/local/
-COPY --link --from=theora /usr/local/ /usr/local/
 COPY --link --from=vorbis /usr/local/ /usr/local/
 COPY --link --from=twolame /usr/local/ /usr/local/
 COPY --link --from=uavs3d /usr/local/ /usr/local/
