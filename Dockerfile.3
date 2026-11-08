@@ -105,6 +105,7 @@ ARG CMAKE_COMMON_FLAGS="-DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -
 ARG CURL_OPTS
 ARG TAR_OPTS
 RUN --mount=from=downloader,src=/downloads,dst=/downloads \
+  cp /downloads/*.patch / && \
   for tarball in /downloads/*.tar.*; do tar $TAR_OPTS "$tarball" || exit 1; done
 
 # before aom as libvmaf uses it
@@ -302,9 +303,8 @@ ARG LIBARIBB24_PR13_SHA256=4812661f1c77ec06a5a12548f166ac8646d4c7c1574848a005f05
 ARG LIBARIBB24_PR17_URL="https://github.com/nkoriyama/aribb24/commit/58a34b8fabf4d0e9e1984fb603a97f52fb934a09.patch"
 ARG LIBARIBB24_PR17_FILE="libaribb24.pr17.patch"
 ARG LIBARIBB24_PR17_SHA256=1a4fc77f677a6ff87d024e3a218186160b23620c84dbd791ec5c425de0a8e6c2
-RUN --mount=from=downloader,src=/downloads,dst=/downloads \
-  cd aribb24-* && \
-  for p in $LIBARIBB24_PR12_FILE $LIBARIBB24_PR13_FILE $LIBARIBB24_PR17_FILE; do patch -p1 < /downloads/$p || exit 1; done && \
+RUN cd aribb24-* && \
+  for p in /libaribb24.pr*.patch; do patch -p1 < $p || exit 1; done && \
   autoreconf -fiv && \
   ./configure \
     --enable-static \
@@ -1246,9 +1246,8 @@ ARG FFMPEG_OAPV_SHA256=f773a85ec68f3b26e0b2ab3cddb7a304df5be8eb5c1887c9b627e23e7
 # ldflags stack-size=2097152 is to increase default stack size from 128KB (musl default) to something
 # more similar to glibc (2MB). This fixing segfault with libaom-av1 and libsvtav1 as they seems to pass
 # large things on the stack.
-RUN --mount=from=downloader,src=/downloads,dst=/downloads \
-  cd ffmpeg-* && \
-  git apply /downloads/$FFMPEG_OAPV_FILE && \
+RUN cd ffmpeg-* && \
+  git apply /$FFMPEG_OAPV_FILE && \
   FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-nonfree " ;else echo ""; fi) && \
   sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
   ./configure \

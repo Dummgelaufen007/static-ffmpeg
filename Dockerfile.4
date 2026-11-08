@@ -184,13 +184,11 @@ ARG LIBARIBB24_PR13_SHA256=4812661f1c77ec06a5a12548f166ac8646d4c7c1574848a005f05
 ARG LIBARIBB24_PR17_URL="https://github.com/nkoriyama/aribb24/commit/58a34b8fabf4d0e9e1984fb603a97f52fb934a09.patch"
 ARG LIBARIBB24_PR17_FILE="libaribb24.pr17.patch"
 ARG LIBARIBB24_PR17_SHA256=1a4fc77f677a6ff87d024e3a218186160b23620c84dbd791ec5c425de0a8e6c2
+COPY --link --from=downloader /downloads/libaribb24.pr*.patch /
 RUN --mount=from=downloader,src=/downloads/$LIBARIBB24_FILE,dst=/$LIBARIBB24_FILE \
-  --mount=from=downloader,src=/downloads/$LIBARIBB24_PR12_FILE,dst=/$LIBARIBB24_PR12_FILE \
-  --mount=from=downloader,src=/downloads/$LIBARIBB24_PR13_FILE,dst=/$LIBARIBB24_PR13_FILE \
-  --mount=from=downloader,src=/downloads/$LIBARIBB24_PR17_FILE,dst=/$LIBARIBB24_PR17_FILE \
   tar $TAR_OPTS /$LIBARIBB24_FILE && \
   cd aribb24-* && \
-  for p in $LIBARIBB24_PR12_FILE $LIBARIBB24_PR13_FILE $LIBARIBB24_PR17_FILE; do patch -p1 < ../$p || exit 1; done && \
+  for p in ../libaribb24.pr*.patch; do patch -p1 < $p || exit 1; done && \
   autoreconf -fiv && \
   ./configure \
     --enable-static \
@@ -1458,8 +1456,8 @@ ARG FFMPEG_OAPV_SHA256=f773a85ec68f3b26e0b2ab3cddb7a304df5be8eb5c1887c9b627e23e7
 # ldflags stack-size=2097152 is to increase default stack size from 128KB (musl default) to something
 # more similar to glibc (2MB). This fixing segfault with libaom-av1 and libsvtav1 as they seems to pass
 # large things on the stack.
+COPY --link --from=downloader /downloads/ffmpeg.*.patch /
 RUN --mount=from=downloader,src=/downloads/$FFMPEG_FILE,dst=/$FFMPEG_FILE \
-  --mount=from=downloader,src=/downloads/$FFMPEG_OAPV_FILE,dst=/$FFMPEG_OAPV_FILE \
   tar $TAR_OPTS /$FFMPEG_FILE && \
   cd ffmpeg-* && \
   git apply ../$FFMPEG_OAPV_FILE && \
