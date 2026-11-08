@@ -103,8 +103,9 @@ RUN apk add --no-cache $APK_OPTS \
 ARG CFLAGS="-O3 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
 ARG CXXFLAGS="-O3 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
 ARG LDFLAGS="-Wl,-z,relro,-z,now"
+ARG CMAKE_COMMON_FLAGS="-DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_LIBDIR=lib"
 ARG TAR_OPTS
-ENV CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" TAR_OPTS="$TAR_OPTS"
+ENV CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" TAR_OPTS="$TAR_OPTS" CMAKE_COMMON_FLAGS="$CMAKE_COMMON_FLAGS"
 RUN mkdir -p /usr/local/share/versions
 
 FROM base AS rust
@@ -152,10 +153,7 @@ RUN --mount=from=downloader,src=/downloads/$AOM_FILE,dst=/$AOM_FILE \
   sed -i 's/^    vmaf_fatal_error("Failed to load VMAF model.");/    if (vmaf_model_load(vmaf_model, \&model_cfg, "vmaf_v0.6.1")) &/' aom_dsp/vmaf.c && \
   mkdir build_tmp && cd build_tmp && \
   cmake \
-    -G"Unix Makefiles" \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_SHARED_LIBS=OFF \
+    $CMAKE_COMMON_FLAGS \
     -DENABLE_APPS=NO \
     -DENABLE_EXAMPLES=NO \
     -DENABLE_DOCS=NO \
@@ -164,7 +162,6 @@ RUN --mount=from=downloader,src=/downloads/$AOM_FILE,dst=/$AOM_FILE \
     -DCONFIG_TUNE_VMAF=1 \
     -DCONFIG_LIBYUV=0 \
     -DENABLE_NASM=ON \
-    -DCMAKE_INSTALL_LIBDIR=lib \
     .. && \
   make -j$(nproc) install && \
   echo "$AOM_VERSION" > /usr/local/share/versions/libaom
@@ -213,11 +210,7 @@ RUN --mount=from=downloader,src=/downloads/$CHROMAPRINT_FILE,dst=/$CHROMAPRINT_F
   tar $TAR_OPTS /$CHROMAPRINT_FILE && \
   cd chromaprint-* && \
   cmake -B build \
-    -G"Unix Makefiles" \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_LIBDIR=lib \
-    -DBUILD_SHARED_LIBS=OFF \
+    $CMAKE_COMMON_FLAGS \
     -DBUILD_TESTS=OFF \
     -DFFT_LIB=fftw3 && \
   cmake --build build -j$(nproc) && \
@@ -544,10 +537,7 @@ RUN --mount=from=downloader,src=/downloads/$LIBGME_FILE,dst=/$LIBGME_FILE \
   cd libgme-* && \
   mkdir build && cd build && \
   cmake \
-    -G"Unix Makefiles" \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_SHARED_LIBS=OFF \
+    $CMAKE_COMMON_FLAGS \
     -DENABLE_UBSAN=OFF \
     .. && \
   make -j$(nproc) install && \
@@ -645,11 +635,7 @@ RUN --mount=from=downloader,src=/downloads/$LIBMYSOFA_FILE,dst=/$LIBMYSOFA_FILE 
   tar $TAR_OPTS /$LIBMYSOFA_FILE && \
   cd libmysofa-*/build && \
   cmake \
-    -G"Unix Makefiles" \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
-    -DCMAKE_INSTALL_LIBDIR=lib \
-    -DBUILD_SHARED_LIBS=OFF \
-    -DCMAKE_BUILD_TYPE=Release \
+    $CMAKE_COMMON_FLAGS \
     -DBUILD_TESTS=OFF \
     .. && \
   make -j$(nproc) install && \
@@ -668,6 +654,7 @@ RUN --mount=from=downloader,src=/downloads/$OPENAPV_FILE,dst=/$OPENAPV_FILE \
   tar $TAR_OPTS /$OPENAPV_FILE && \
   cd openapv-* && \
   cmake -B build \
+    $CMAKE_COMMON_FLAGS \
     -DOAPV_BUILD_APPS=OFF \
     -DOAPV_BUILD_SHARED_LIB=OFF && \
   cmake --build build -j$(nproc) && \
@@ -704,10 +691,7 @@ RUN --mount=from=downloader,src=/downloads/$OPENJPEG_FILE,dst=/$OPENJPEG_FILE \
   cd openjpeg-* && \
   mkdir build && cd build && \
   cmake \
-    -G"Unix Makefiles" \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_SHARED_LIBS=OFF \
+    $CMAKE_COMMON_FLAGS \
     -DBUILD_CODEC=OFF \
     -DWITH_ASTYLE=OFF \
     -DBUILD_TESTING=OFF \
@@ -748,14 +732,10 @@ RUN --mount=from=downloader,src=/downloads/$LIBRABBITMQ_FILE,dst=/$LIBRABBITMQ_F
   cd rabbitmq-c-* && \
   mkdir build && cd build && \
   cmake \
-    -G"Unix Makefiles" \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DBUILD_EXAMPLES=OFF \
-    -DBUILD_SHARED_LIBS=OFF \
     -DBUILD_STATIC_LIBS=ON \
     -DCMAKE_INSTALL_PREFIX=/usr/local \
-    -DCMAKE_INSTALL_LIBDIR=lib \
-    -DCMAKE_BUILD_TYPE=Release \
+    $CMAKE_COMMON_FLAGS \
     -DBUILD_TESTING=OFF \
     -DENABLE_SSL_SUPPORT=OFF \
     -DBUILD_TOOLS=OFF \
@@ -870,16 +850,13 @@ RUN --mount=from=downloader,src=/downloads/$SRT_FILE,dst=/$SRT_FILE \
   cd srt-* && \
   mkdir build && cd build && \
   cmake \
-    -G"Unix Makefiles" \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
-    -DCMAKE_BUILD_TYPE=Release \
+    $CMAKE_COMMON_FLAGS \
     -DENABLE_SHARED=OFF \
     -DENABLE_APPS=OFF \
     -DENABLE_CXX11=ON \
     -DUSE_STATIC_LIBSTDCXX=ON \
     -DSRT_USE_OPENSSL_STATIC_LIBS=ON \
     -DENABLE_LOGGING=OFF \
-    -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_INSTALL_INCLUDEDIR=include \
     -DCMAKE_INSTALL_BINDIR=bin \
     .. && \
@@ -902,11 +879,7 @@ RUN --mount=from=downloader,src=/downloads/$LIBSSH_FILE,dst=/$LIBSSH_FILE \
   mkdir build && cd build && \
   echo -e 'Requires.private: libssl libcrypto zlib \nLibs.private: -DLIBSSH_STATIC=1 -lssh\nCflags.private: -DLIBSSH_STATIC=1 -I${CMAKE_INSTALL_FULL_INCLUDEDIR}' >> ../libssh.pc.cmake && \
   cmake \
-    -G"Unix Makefiles" \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
-    -DCMAKE_INSTALL_LIBDIR=lib \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_SHARED_LIBS=OFF \
+    $CMAKE_COMMON_FLAGS \
     -DWITH_GSSAPI=OFF \
     -DWITH_BLOWFISH_CIPHER=ON \
     -DWITH_SFTP=ON \
@@ -937,14 +910,10 @@ RUN --mount=from=downloader,src=/downloads/$SVTAV1_FILE,dst=/$SVTAV1_FILE \
   tar $TAR_OPTS /$SVTAV1_FILE && \
   cd SVT-AV1-*/Build && \
   cmake \
-    -G"Unix Makefiles" \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
-    -DCMAKE_INSTALL_LIBDIR=lib \
-    -DBUILD_SHARED_LIBS=OFF \
     -DBUILD_APPS=OFF \
     -DSVT_AV1_LTO=OFF \
     -DENABLE_AVX512=ON \
-    -DCMAKE_BUILD_TYPE=Release \
+    $CMAKE_COMMON_FLAGS \
     .. && \
   make -j$(nproc) install && \
   echo "$SVTAV1_VERSION" > /usr/local/share/versions/libsvtav1
@@ -1065,10 +1034,7 @@ RUN --mount=from=downloader,src=/downloads/$UAVS3D_FILE,dst=/$UAVS3D_FILE \
   cd uavs3d-* && \
   mkdir build/linux && cd build/linux && \
   cmake3.5 \
-    -G"Unix Makefiles" \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_SHARED_LIBS=OFF \
+    $CMAKE_COMMON_FLAGS \
     -DCOMPILE_10BIT=1 \
     ../.. && \
   make -j$(nproc) install && \
@@ -1090,11 +1056,8 @@ RUN --mount=from=downloader,src=/downloads/$VIDSTAB_FILE,dst=/$VIDSTAB_FILE \
   # Since in emulated container the /proc is mounted from the host, the cmake not able to detect CPU features correctly.
   sed -i 's/include (FindSSE)/if(CMAKE_SYSTEM_ARCH MATCHES "amd64")\ninclude (FindSSE)\nendif()/' ../CMakeLists.txt && \
   cmake \
-    -G"Unix Makefiles" \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_SYSTEM_ARCH=$(arch) \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_SHARED_LIBS=OFF \
+    $CMAKE_COMMON_FLAGS \
     -DUSE_OMP=ON \
     .. && \
   make -j$(nproc) install && \
@@ -1181,13 +1144,13 @@ ARG X265_SHA256=83c53e4c8bbb8f1e33ed59e10a7d621d1d7801ca853910c3eb41f038b8ffb121
 RUN --mount=from=downloader,src=/downloads/$X265_FILE,dst=/$X265_FILE \
   tar $TAR_OPTS /$X265_FILE && \
   cd x265_*/build/linux && \
-  sed -i '/^cmake / s/$/ -G "Unix Makefiles" ${CMAKEFLAGS}/' ./multilib.sh && \
+  sed -i '/^cmake / s/$/ ${CMAKEFLAGS}/' ./multilib.sh && \
   sed -i 's/ -DENABLE_SHARED=OFF//g' ./multilib.sh && \
   # hdr10+ for the 10 and 12 bit builds only, 8 bit has no use for it
   sed -i 's/-DHIGH_BIT_DEPTH=ON/& -DENABLE_HDR10_PLUS=ON/' ./multilib.sh && \
   sed -i '1i #include <cstdint>' ../../source/dynamicHDR10/json11/json11.cpp && \
   MAKEFLAGS="-j$(nproc)" \
-  CMAKEFLAGS="-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DENABLE_ALPHA=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release" \
+  CMAKEFLAGS="-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DENABLE_ALPHA=ON $CMAKE_COMMON_FLAGS" \
   ./multilib.sh && \
   make -C 8bit -j$(nproc) install && \
   echo "$X265_VERSION" > /usr/local/share/versions/libx265
@@ -1247,9 +1210,8 @@ RUN --mount=from=downloader,src=/downloads/$XEVE_FILE,dst=/$XEVE_FILE \
   sed -i 's/mc_filter_bilin/xevem_mc_filter_bilin/' src_main/sse/xevem_mc_sse.c && \
   mkdir build && cd build && \
   cmake \
-    -G"Unix Makefiles" \
     -DARM="$(if [ $(uname -m) == aarch64 ]; then echo TRUE; else echo FALSE; fi)" \
-    -DCMAKE_BUILD_TYPE=Release \
+    $CMAKE_COMMON_FLAGS \
     .. && \
   make -j$(nproc) install && \
   echo "$XEVE_VERSION" > /usr/local/share/versions/libxeve
@@ -1269,9 +1231,8 @@ RUN --mount=from=downloader,src=/downloads/$XEVD_FILE,dst=/$XEVD_FILE \
   echo v$XEVD_VERSION > version.txt && \
   mkdir build && cd build && \
   cmake \
-    -G"Unix Makefiles" \
     -DARM="$(if [ $(uname -m) == aarch64 ]; then echo TRUE; else echo FALSE; fi)" \
-    -DCMAKE_BUILD_TYPE=Release \
+    $CMAKE_COMMON_FLAGS \
     .. && \
   make -j$(nproc) install && \
   echo "$XEVD_VERSION" > /usr/local/share/versions/libxevd
@@ -1329,8 +1290,7 @@ RUN --mount=from=downloader,src=/downloads/$HIGHWAY_FILE,dst=/$HIGHWAY_FILE \
   tar $TAR_OPTS /$HIGHWAY_FILE && \
   cd highway-* && \
   cmake -B build \
-    -G"Unix Makefiles" \
-    -DCMAKE_BUILD_TYPE=Release \
+    $CMAKE_COMMON_FLAGS \
     -DHWY_ENABLE_CONTRIB=OFF \
     -DHWY_ENABLE_EXAMPLES=OFF \
     -DHWY_ENABLE_TESTS=OFF && \
@@ -1345,12 +1305,8 @@ RUN --mount=from=downloader,src=/downloads/$LIBJXL_FILE,dst=/$LIBJXL_FILE \
   tar $TAR_OPTS /$LIBJXL_FILE && \
   cd libjxl-* && \
   cmake -B build \
-    -G"Unix Makefiles" \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
-    -DCMAKE_INSTALL_LIBDIR=lib \
+    $CMAKE_COMMON_FLAGS \
     -DCMAKE_INSTALL_PREFIX=/usr/local \
-    -DBUILD_SHARED_LIBS=OFF \
     -DBUILD_TESTING=OFF \
     -DJPEGXL_ENABLE_PLUGINS=OFF \
     -DJPEGXL_ENABLE_BENCHMARK=OFF \
@@ -1413,7 +1369,7 @@ RUN --mount=from=downloader,src=/downloads/$VVENC_FILE,dst=/$VVENC_FILE \
     -DVVENC_ENABLE_WERROR=OFF \
     -DVVENC_LIBRARY_ONLY=ON \
     -DVVENC_ENABLE_LINK_TIME_OPT=OFF \
-    -DCMAKE_BUILD_TYPE=Release \
+    $CMAKE_COMMON_FLAGS \
     -DCMAKE_INSTALL_PREFIX=/usr/local && \
   cmake --build build/release-static -j$(nproc) && \
   cmake --build build/release-static --target install && \
