@@ -312,7 +312,7 @@ RUN \
   curl $CURL_OPTS -o $LIBARIBB24_PR17_FILE "$LIBARIBB24_PR17_URL" && \
   echo "$LIBARIBB24_PR17_SHA256  $LIBARIBB24_PR17_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $LIBARIBB24_FILE && cd aribb24-* && \
-  for p in $LIBARIBB24_PR12_FILE $LIBARIBB24_PR13_FILE $LIBARIBB24_PR17_FILE; do patch -p1 < ../$p || exit 1; done && \
+  for p in $LIBARIBB24_PR12_FILE $LIBARIBB24_PR13_FILE $LIBARIBB24_PR17_FILE; do patch -p1 < /$p || exit 1; done && \
   autoreconf -fiv && \
   ./configure \
     --enable-static \
@@ -1356,7 +1356,7 @@ RUN \
   curl $CURL_OPTS -o $FFMPEG_OAPV_FILE "$FFMPEG_OAPV_URL" && \
   echo "$FFMPEG_OAPV_SHA256  $FFMPEG_OAPV_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $FFMPEG_FILE && cd ffmpeg-* && \
-  git apply ../$FFMPEG_OAPV_FILE && \
+  patch -p1 < /$FFMPEG_OAPV_FILE && \
   FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-nonfree " ;else echo ""; fi) && \
   sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
   ./configure \

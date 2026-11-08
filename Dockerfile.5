@@ -188,7 +188,7 @@ COPY --link --from=downloader /downloads/libaribb24.pr*.patch /
 RUN --mount=from=downloader,src=/downloads/$LIBARIBB24_FILE,dst=/$LIBARIBB24_FILE \
   tar $TAR_OPTS /$LIBARIBB24_FILE && \
   cd aribb24-* && \
-  for p in ../libaribb24.pr*.patch; do patch -p1 < $p || exit 1; done && \
+  for p in /libaribb24.pr*.patch; do patch -p1 < $p || exit 1; done && \
   autoreconf -fiv && \
   ./configure \
     --enable-static \
@@ -1483,7 +1483,7 @@ COPY --link --from=downloader /downloads/ffmpeg.*.patch /
 RUN --mount=from=downloader,src=/downloads/$FFMPEG_FILE,dst=/$FFMPEG_FILE \
   tar $TAR_OPTS /$FFMPEG_FILE && \
   cd ffmpeg-* && \
-  git apply ../$FFMPEG_OAPV_FILE && \
+  patch -p1 < /$FFMPEG_OAPV_FILE && \
   FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-nonfree " ;else echo ""; fi) && \
   sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
   ./configure \

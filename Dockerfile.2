@@ -166,7 +166,7 @@ ADD --checksum=sha256:$LIBARIBB24_PR13_SHA256 $LIBARIBB24_PR13_URL /$LIBARIBB24_
 ADD --checksum=sha256:$LIBARIBB24_PR17_SHA256 $LIBARIBB24_PR17_URL /$LIBARIBB24_PR17_FILE
 RUN \
   cd aribb24-* && \
-  for p in $LIBARIBB24_PR12_FILE $LIBARIBB24_PR13_FILE $LIBARIBB24_PR17_FILE; do patch -p1 < ../$p || exit 1; done && \
+  for p in $LIBARIBB24_PR12_FILE $LIBARIBB24_PR13_FILE $LIBARIBB24_PR17_FILE; do patch -p1 < /$p || exit 1; done && \
   autoreconf -fiv && \
   ./configure \
     --enable-static \
@@ -1439,7 +1439,7 @@ ADD --checksum=sha256:$FFMPEG_SHA256 --unpack=true $FFMPEG_URL /
 ADD --checksum=sha256:$FFMPEG_OAPV_SHA256 $FFMPEG_OAPV_URL /$FFMPEG_OAPV_FILE
 RUN \
   cd ffmpeg-* && \
-  git apply ../$FFMPEG_OAPV_FILE && \
+  patch -p1 < /$FFMPEG_OAPV_FILE && \
   FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-nonfree " ;else echo ""; fi) && \
   sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
   ./configure \
