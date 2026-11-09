@@ -109,7 +109,7 @@ RUN \
     -Denable_tools=false \
     -Denable_avx512=true \
     -Denable_float=true && \
-  ninja -j$(nproc) -vC build install && \
+  ninja -j$(nproc) -l$(nproc) -vC build install && \
 # extra libs stdc++ is for vmaf https://github.com/Netflix/vmaf/issues/788
   sed -i 's/-lvmaf /-lvmaf -lstdc++ /' /usr/local/lib/pkgconfig/libvmaf.pc && \
   echo "$VMAF_VERSION" > /usr/local/share/versions/libvmaf
@@ -138,7 +138,7 @@ RUN \
     -DCONFIG_LIBYUV=0 \
     -DENABLE_NASM=ON \
     .. && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$AOM_VERSION" > /usr/local/share/versions/libaom
 
 FROM base AS libaribb24
@@ -170,7 +170,7 @@ RUN \
   ./configure \
     --enable-static \
     --disable-shared && \
-  make -j$(nproc) && make install && \
+  make -j$(nproc) -l$(nproc) && make install && \
   echo "$LIBARIBB24_VERSION" > /usr/local/share/versions/libaribb24
 
 FROM base AS chromaprint
@@ -188,13 +188,12 @@ RUN \
     $CMAKE_COMMON_FLAGS \
     -DBUILD_TESTS=OFF \
     -DFFT_LIB=fftw3 && \
-  cmake --build build -j$(nproc) && \
+  cmake --build build -j$(nproc) -- -l$(nproc) && \
   cmake --install build && \
   echo "Libs.private: -lfftw3 -lstdc++" >> /usr/local/lib/pkgconfig/libchromaprint.pc && \
   echo "$CHROMAPRINT_VERSION" > /usr/local/share/versions/chromaprint
 
-# hard: pango needs glib, harfbuzz and cairo; librsvg needs rust, pango and, for -Davif=enabled, dav1d; libass needs harfbuzz, which is not an apk package, and, for --enable-libunibreak, libunibreak
-FROM rust AS libass
+FROM base AS glib
 # own build as alpine glib links with libmount etc
 # bump: glib /GLIB_VERSION=([\d.]+)/ https://gitlab.gnome.org/GNOME/glib.git|^2
 # bump: glib after ./hashupdate Dockerfile GLIB $LATEST
@@ -216,11 +215,13 @@ RUN \
     -Dglib_debug=disabled \
     -Dlibmount=disabled && \
   # only the targets with the install tags devel and bin-devel: libraries, headers, .pc files and build tools
-  ninja -j$(nproc) -vC build $(jq -r --arg b "$PWD/build/" '.targets | to_entries[] | select(.value.tag == "devel" or .value.tag == "bin-devel") | .key | ltrimstr($b)' build/meson-info/intro-install_plan.json) && \
+  ninja -j$(nproc) -l$(nproc) -vC build $(jq -r --arg b "$PWD/build/" '.targets | to_entries[] | select(.value.tag == "devel" or .value.tag == "bin-devel") | .key | ltrimstr($b)' build/meson-info/intro-install_plan.json) && \
   meson install -C build --no-rebuild --tags devel,bin-devel && \
 # exported symbols keep rust thread locals as unresolved relocations that a static pie never applies
   sed -i 's/-Wl,--export-dynamic//' /usr/local/lib/pkgconfig/gmodule-2.0.pc /usr/local/lib/pkgconfig/gmodule-export-2.0.pc
 
+# glib is optional (auto) for harfbuzz, kept before it for identical output
+FROM glib AS harfbuzz
 # bump: harfbuzz /LIBHARFBUZZ_VERSION=([\d.]+)/ https://github.com/harfbuzz/harfbuzz.git|*
 # bump: harfbuzz after ./hashupdate Dockerfile LIBHARFBUZZ $LATEST
 # bump: harfbuzz link "NEWS" https://github.com/harfbuzz/harfbuzz/blob/main/NEWS
@@ -241,9 +242,11 @@ RUN \
     -Dgpu=disabled \
     -Dtests=disabled \
     -Dutilities=disabled && \
-  ninja -j$(nproc) -vC build install && \
+  ninja -j$(nproc) -l$(nproc) -vC build install && \
   echo "$LIBHARFBUZZ_VERSION" > /usr/local/share/versions/libharfbuzz
 
+# hard: librsvg needs cairo-gobject, which cairo builds only with glib
+FROM glib AS cairo
 # bump: cairo /CAIRO_VERSION=([\d.]+)/ https://gitlab.freedesktop.org/cairo/cairo.git|^1
 # bump: cairo after ./hashupdate Dockerfile CAIRO $LATEST
 # bump: cairo link "NEWS" https://gitlab.freedesktop.org/cairo/cairo/-/blob/master/NEWS?ref_type=heads
@@ -265,8 +268,11 @@ RUN \
     -Dxcb=disabled \
     -Dxlib=disabled \
     -Dxlib-xcb=disabled && \
-  ninja -j$(nproc) -vC build install
+  ninja -j$(nproc) -l$(nproc) -vC build install
 
+# hard: pango needs glib, harfbuzz and cairo
+FROM harfbuzz AS pango
+COPY --link --from=cairo /usr/local/ /usr/local/
 # TODO: there is weird "1.90" tag, skip it
 # bump: pango /PANGO_VERSION=([\d.]+)/ https://github.com/GNOME/pango.git|/\d+\.\d+\.\d+/|*
 # bump: pango after ./hashupdate Dockerfile PANGO $LATEST
@@ -285,8 +291,9 @@ RUN \
     -Dbuild-testsuite=false \
     -Dbuild-examples=false \
     -Dgtk_doc=false && \
-  ninja -j$(nproc) -vC build install
+  ninja -j$(nproc) -l$(nproc) -vC build install
 
+FROM base AS dav1d
 # bump: dav1d /DAV1D_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/dav1d/last/|/dav1d-([\d.]+)\.tar\.xz/
 # bump: dav1d after ./hashupdate Dockerfile DAV1D $LATEST
 # bump: dav1d link "Release notes" https://code.videolan.org/videolan/dav1d/-/tags/$LATEST
@@ -302,9 +309,13 @@ RUN \
     -Ddefault_library=static \
     -Denable_tools=false \
     -Denable_tests=false && \
-  ninja -j$(nproc) -vC build install && \
+  ninja -j$(nproc) -l$(nproc) -vC build install && \
   echo "$DAV1D_VERSION" > /usr/local/share/versions/libdav1d
 
+# hard: librsvg needs rust, pango and, for -Davif=enabled, dav1d
+FROM rust AS librsvg
+COPY --link --from=pango /usr/local/ /usr/local/
+COPY --link --from=dav1d /usr/local/ /usr/local/
 # bump: librsvg /LIBRSVG_VERSION=([\d.]+)/ https://gitlab.gnome.org/GNOME/librsvg.git|^2
 # bump: librsvg after ./hashupdate Dockerfile LIBRSVG $LATEST
 # bump: librsvg link "NEWS" https://gitlab.gnome.org/GNOME/librsvg/-/blob/master/NEWS
@@ -328,9 +339,10 @@ RUN --mount=type=cache,target=/root/.cargo/registry --mount=type=cache,target=/r
     -Dvala=disabled \
     -Drsvg-convert=disabled \
     -Dtests=false && \
-  ninja -j$(nproc) -vC build install && \
+  ninja -j$(nproc) -l$(nproc) -vC build install && \
   echo "$LIBRSVG_VERSION" > /usr/local/share/versions/librsvg
 
+FROM base AS libunibreak
 # bump: libunibreak /LIBUNIBREAK_VERSION=([\d.]+)/ gitrefs:https://github.com/adah1972/libunibreak.git|re:#^refs/tags/libunibreak_(\d+)_(\d+)$#${1}.${2}#|*
 # bump: libunibreak after sed -i -E "s#/libunibreak_[0-9_]+/#/libunibreak_$(echo $LATEST | tr . _)/#" Dockerfile && ./hashupdate Dockerfile LIBUNIBREAK $LATEST
 # bump: libunibreak link "NEWS" https://github.com/adah1972/libunibreak/blob/master/NEWS
@@ -344,9 +356,12 @@ RUN \
   ./configure \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$LIBUNIBREAK_VERSION" > /usr/local/share/versions/libunibreak
 
+# hard: libass needs harfbuzz, which is not an apk package, and, for --enable-libunibreak, libunibreak
+FROM harfbuzz AS libass
+COPY --link --from=libunibreak /usr/local/ /usr/local/
 # bump: libass /LIBASS_VERSION=([\d.]+)/ https://github.com/libass/libass.git|*
 # bump: libass after ./hashupdate Dockerfile LIBASS $LATEST
 # bump: libass link "Release notes" https://github.com/libass/libass/releases/tag/$LATEST
@@ -361,7 +376,7 @@ RUN \
     --enable-libunibreak \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) && make install && \
+  make -j$(nproc) -l$(nproc) && make install && \
   echo "$LIBASS_VERSION" > /usr/local/share/versions/libass
 
 # hard: libbluray requires libudfread
@@ -379,7 +394,7 @@ RUN \
   meson setup build \
     -Dbuildtype=release \
     -Ddefault_library=static && \
-  ninja -j$(nproc) -vC build install
+  ninja -j$(nproc) -l$(nproc) -vC build install
 
 # bump: libbluray /LIBBLURAY_VERSION=([\d.]+)/ fetch:https://download.videolan.org/pub/videolan/libbluray/last/|/libbluray-([\d.]+)\.tar\.xz/
 # bump: libbluray after ./hashupdate Dockerfile LIBBLURAY $LATEST
@@ -396,7 +411,7 @@ RUN \
     -Ddefault_library=static \
     -Denable_tools=false \
     -Dfreetype=disabled && \
-  ninja -j$(nproc) -vC build install && \
+  ninja -j$(nproc) -l$(nproc) -vC build install && \
   echo "$LIBBLURAY_VERSION" > /usr/local/share/versions/libbluray
 
 FROM base AS davs2
@@ -417,7 +432,7 @@ RUN \
     --enable-pic \
     --enable-strip \
     --disable-cli && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$DAVS2_VERSION" > /usr/local/share/versions/libdavs2
 
 # hard: libdvdnav requires libdvdread
@@ -437,7 +452,7 @@ RUN \
   meson setup build \
     -Dbuildtype=release \
     -Ddefault_library=static && \
-  ninja -j$(nproc) -vC build install && \
+  ninja -j$(nproc) -l$(nproc) -vC build install && \
   echo "$LIBDVDCSS_VERSION" > /usr/local/share/versions/libdvdcss; \
   fi
 
@@ -456,7 +471,7 @@ RUN \
     -Dbuildtype=release \
     -Ddefault_library=static \
     -Dlibdvdcss=$(if [[ -n "$ENABLE_LIBDVDCSS" ]]; then echo enabled; else echo disabled; fi) && \
-  ninja -j$(nproc) -vC build install && \
+  ninja -j$(nproc) -l$(nproc) -vC build install && \
 # musl has off64_t of the public headers only if this is defined before the first sys/types.h
   sed -i 's/^Cflags: .*/& -D_LARGEFILE64_SOURCE/' /usr/local/lib/pkgconfig/dvdread.pc && \
   echo "$LIBDVDREAD_VERSION" > /usr/local/share/versions/libdvdread
@@ -474,7 +489,7 @@ RUN \
   meson setup build \
     -Dbuildtype=release \
     -Ddefault_library=static && \
-  ninja -j$(nproc) -vC build install && \
+  ninja -j$(nproc) -l$(nproc) -vC build install && \
   echo "$LIBDVDNAV_VERSION" > /usr/local/share/versions/libdvdnav
 
 FROM base AS fdk-aac
@@ -495,7 +510,7 @@ RUN \
   ./configure \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$FDK_AAC_VERSION" > /usr/local/share/versions/libfdk-aac; \
   fi
 
@@ -515,7 +530,7 @@ RUN \
     $CMAKE_COMMON_FLAGS \
     -DENABLE_UBSAN=OFF \
     .. && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$LIBGME_VERSION" > /usr/local/share/versions/libgme
 
 FROM base AS libgsm
@@ -555,7 +570,7 @@ RUN \
   ./configure \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$KVAZAAR_VERSION" > /usr/local/share/versions/libkvazaar
 
 FROM base AS libmodplug
@@ -572,7 +587,7 @@ RUN \
   ./configure \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$LIBMODPLUG_VERSION" > /usr/local/share/versions/libmodplug
 
 FROM base AS mp3lame
@@ -594,7 +609,7 @@ RUN \
     --disable-cpml \
     --disable-decoder \
     --disable-frontend && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$MP3LAME_VERSION" > /usr/local/share/versions/libmp3lame
 
 FROM base AS libmysofa
@@ -613,7 +628,7 @@ RUN \
     $CMAKE_COMMON_FLAGS \
     -DBUILD_TESTS=OFF \
     .. && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$LIBMYSOFA_VERSION" > /usr/local/share/versions/libmysofa
 
 FROM base AS openapv
@@ -632,7 +647,7 @@ RUN \
     $CMAKE_COMMON_FLAGS \
     -DOAPV_BUILD_APPS=OFF \
     -DOAPV_BUILD_SHARED_LIB=OFF && \
-  cmake --build build -j$(nproc) && \
+  cmake --build build -j$(nproc) -- -l$(nproc) && \
   cmake --install build && \
   echo "$OPENAPV_VERSION" > /usr/local/share/versions/liboapv
 
@@ -650,7 +665,7 @@ RUN \
   ./configure \
     --enable-static \
     --disable-shared && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$OPENCOREAMR_VERSION" > /usr/local/share/versions/libopencoreamr
 
 FROM base AS openjpeg
@@ -671,7 +686,7 @@ RUN \
     -DWITH_ASTYLE=OFF \
     -DBUILD_TESTING=OFF \
     .. && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$OPENJPEG_VERSION" > /usr/local/share/versions/libopenjpeg
 
 FROM base AS opus
@@ -691,7 +706,7 @@ RUN \
     --enable-static \
     --disable-extra-programs \
     --disable-doc && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$OPUS_VERSION" > /usr/local/share/versions/libopus
 
 FROM base AS librabbitmq
@@ -717,7 +732,7 @@ RUN \
     -DBUILD_TOOLS_DOCS=OFF \
     -DRUN_SYSTEM_TESTS=OFF \
     .. && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$LIBRABBITMQ_VERSION" > /usr/local/share/versions/librabbitmq
 
 FROM rust AS rav1e
@@ -748,7 +763,7 @@ ARG LIBRTMP_COMMIT=138fdb258d9fc26f1843fd1b891180416c9dc575
 ADD --checksum=$LIBRTMP_COMMIT $LIBRTMP_URL#$LIBRTMP_COMMIT /rtmpdump
 RUN \
   cd rtmpdump && \
-  make SYS=posix SHARED=off XCFLAGS="$CFLAGS" OPT= -j$(nproc) install && \
+  make SYS=posix SHARED=off XCFLAGS="$CFLAGS" OPT= -j$(nproc) -l$(nproc) install && \
   echo "$LIBRTMP_COMMIT" > /usr/local/share/versions/librtmp
 
 FROM base AS rubberband
@@ -767,7 +782,7 @@ RUN \
     -Ddefault_library=static \
     -Dfft=fftw \
     -Dresampler=libsamplerate && \
-  ninja -j$(nproc) -vC build install && \
+  ninja -j$(nproc) -l$(nproc) -vC build install && \
   echo "$RUBBERBAND_VERSION" > /usr/local/share/versions/librubberband
 
 FROM base AS libshine
@@ -790,7 +805,7 @@ RUN \
     --enable-static \
     --disable-shared \
     --disable-fast-install && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$LIBSHINE_VERSION" > /usr/local/share/versions/libshine
 
 FROM base AS speex
@@ -809,7 +824,7 @@ RUN \
   ./configure \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$SPEEX_VERSION" > /usr/local/share/versions/libspeex
 
 FROM base AS srt
@@ -835,7 +850,7 @@ RUN \
     -DCMAKE_INSTALL_INCLUDEDIR=include \
     -DCMAKE_INSTALL_BINDIR=bin \
     .. && \
-  make -j$(nproc) && make install && \
+  make -j$(nproc) -l$(nproc) && make install && \
   echo "$SRT_VERSION" > /usr/local/share/versions/libsrt
 
 FROM base AS libssh
@@ -870,7 +885,7 @@ RUN \
     -DWITH_EXAMPLES=OFF \
     -DWITH_INTERNAL_DOC=OFF \
     .. && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$LIBSSH_VERSION" > /usr/local/share/versions/libssh
 
 FROM base AS svtav1
@@ -890,11 +905,10 @@ RUN \
     -DENABLE_AVX512=ON \
     $CMAKE_COMMON_FLAGS \
     .. && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$SVTAV1_VERSION" > /usr/local/share/versions/libsvtav1
 
-# hard: theora and vorbis need ogg; libopenmpt picks up ogg and vorbis, kept after them for identical output
-FROM base AS vorbis
+FROM base AS ogg
 # bump: ogg /OGG_VERSION=([\d.]+)/ https://github.com/xiph/ogg.git|*
 # bump: ogg after ./hashupdate Dockerfile OGG $LATEST
 # bump: ogg link "CHANGES" https://github.com/xiph/ogg/blob/master/CHANGES
@@ -909,9 +923,11 @@ RUN \
   ./configure \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$OGG_VERSION" > /usr/local/share/versions/libogg
 
+# hard: theora needs ogg
+FROM ogg AS theora
 # bump: theora /THEORA_VERSION=([\d.]+)/ https://github.com/xiph/theora.git|*
 # bump: theora after ./hashupdate Dockerfile THEORA $LATEST
 # bump: theora link "Release notes" https://github.com/xiph/theora/releases/tag/v$LATEST
@@ -931,9 +947,11 @@ RUN \
    --disable-oggtest \
    --disable-shared \
    --enable-static && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$THEORA_VERSION" > /usr/local/share/versions/libtheora
 
+# hard: vorbis needs ogg; libopenmpt picks up ogg and vorbis, kept after them for identical output
+FROM ogg AS vorbis
 # bump: vorbis /VORBIS_VERSION=([\d.]+)/ https://github.com/xiph/vorbis.git|*
 # bump: vorbis after ./hashupdate Dockerfile VORBIS $LATEST
 # bump: vorbis link "CHANGES" https://github.com/xiph/vorbis/blob/master/CHANGES
@@ -949,7 +967,7 @@ RUN \
     --disable-shared \
     --enable-static \
     --disable-oggtest && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$VORBIS_VERSION" > /usr/local/share/versions/libvorbis
 
 # after vorbis; the makefile release bundles minimp3 in place of mpg123, which alpine has no static build of
@@ -963,7 +981,7 @@ ARG LIBOPENMPT_SHA256=9273b88b67973cc69e54d748ab1b749399d6d07695f1c37d0c59f88b41
 ADD --checksum=sha256:$LIBOPENMPT_SHA256 --unpack=true $LIBOPENMPT_URL /
 RUN \
   cd libopenmpt-* && \
-  make -j$(nproc) \
+  make -j$(nproc) -l$(nproc) \
     PREFIX=/usr/local \
     CXXSTDLIB_PCLIBSPRIVATE=-lstdc++ \
     VERBOSE=2 \
@@ -992,7 +1010,7 @@ RUN \
     --enable-static \
     --disable-sndfile \
     --with-pic && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$TWOLAME_VERSION" > /usr/local/share/versions/libtwolame
 
 FROM base AS uavs3d
@@ -1012,7 +1030,7 @@ RUN \
     $CMAKE_COMMON_FLAGS \
     -DCOMPILE_10BIT=1 \
     ../.. && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$UAVS3D_VERSION" > /usr/local/share/versions/libuavs3d
 
 FROM base AS vid.stab
@@ -1035,7 +1053,7 @@ RUN \
     $CMAKE_COMMON_FLAGS \
     -DUSE_OMP=ON \
     .. && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "Libs.private: -ldl" >> /usr/local/lib/pkgconfig/vidstab.pc && \
   echo "$VIDSTAB_VERSION" > /usr/local/share/versions/libvidstab
 
@@ -1058,7 +1076,7 @@ RUN \
     --disable-unit-tests \
     --disable-tools \
     --disable-examples && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$VPX_VERSION" > /usr/local/share/versions/libvpx
 
 FROM base AS libwebp
@@ -1087,7 +1105,7 @@ RUN \
     --disable-jpeg \
     --disable-tiff \
     --disable-gif && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$LIBWEBP_VERSION" > /usr/local/share/versions/libwebp
 
 FROM base AS x264
@@ -1104,7 +1122,7 @@ RUN \
     --enable-pic \
     --enable-static \
     --disable-cli && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$X264_COMMIT" > /usr/local/share/versions/libx264
 
 FROM base AS x265
@@ -1125,10 +1143,10 @@ RUN \
   # hdr10+ for the 10 and 12 bit builds only, 8 bit has no use for it
   sed -i 's/-DHIGH_BIT_DEPTH=ON/& -DENABLE_HDR10_PLUS=ON/' ./multilib.sh && \
   sed -i '1i #include <cstdint>' ../../source/dynamicHDR10/json11/json11.cpp && \
-  MAKEFLAGS="-j$(nproc)" \
+  MAKEFLAGS="-j$(nproc) -l$(nproc)" \
   CMAKEFLAGS="-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DENABLE_ALPHA=ON $CMAKE_COMMON_FLAGS" \
   ./multilib.sh && \
-  make -C 8bit -j$(nproc) install && \
+  make -C 8bit -j$(nproc) -l$(nproc) install && \
   echo "$X265_VERSION" > /usr/local/share/versions/libx265
 
 FROM base AS xavs2
@@ -1150,7 +1168,7 @@ RUN \
     $([ "$(arch)" = x86_64 ] || echo --disable-asm) \
     --enable-pic \
     --disable-cli && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$XAVS2_VERSION" > /usr/local/share/versions/libxavs2
 
 FROM base AS xvid
@@ -1167,7 +1185,7 @@ RUN \
   cd xvidcore/build/generic && \
   # gnu18 to fix issue type own bool typedef
   CFLAGS="$CFLAGS -std=gnu18 -fstrength-reduce -ffast-math" ./configure && \
-  make -j$(nproc) && make install && \
+  make -j$(nproc) -l$(nproc) && make install && \
   echo "$XVID_VERSION" > /usr/local/share/versions/libxvid
 
 FROM base AS xeve
@@ -1189,7 +1207,7 @@ RUN \
     -DARM="$(if [ $(uname -m) == aarch64 ]; then echo TRUE; else echo FALSE; fi)" \
     $CMAKE_COMMON_FLAGS \
     .. && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$XEVE_VERSION" > /usr/local/share/versions/libxeve
 
 FROM base AS xevd
@@ -1210,7 +1228,7 @@ RUN \
     -DARM="$(if [ $(uname -m) == aarch64 ]; then echo TRUE; else echo FALSE; fi)" \
     $CMAKE_COMMON_FLAGS \
     .. && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$XEVD_VERSION" > /usr/local/share/versions/libxevd
 
 FROM base AS zimg
@@ -1228,11 +1246,10 @@ RUN \
   ./configure \
     --disable-shared \
     --enable-static && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$ZIMG_VERSION" > /usr/local/share/versions/libzimg
 
-# hard: -DJPEGXL_FORCE_SYSTEM_HWY=ON needs highway, -DJPEGXL_ENABLE_SKCMS=OFF needs lcms2
-FROM base AS libjxl
+FROM base AS lcms2
 # bump: lcms2 /LCMS2_VERSION=([\d.]+)/ https://github.com/mm2/Little-CMS.git|^2
 # bump: lcms2 after ./hashupdate Dockerfile LCMS2 $LATEST
 # bump: lcms2 link "Release" https://github.com/mm2/Little-CMS/releases/tag/lcms$LATEST
@@ -1249,13 +1266,10 @@ RUN \
     --without-jpeg \
     --without-tiff \
     --disable-shared && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$LCMS2_VERSION" > /usr/local/share/versions/lcms2
 
-# bump: libjxl /LIBJXL_VERSION=([\d.]+)/ https://github.com/libjxl/libjxl.git|^0
-# bump: libjxl after ./hashupdate Dockerfile LIBJXL $LATEST
-# bump: libjxl after HWY=$(curl -sL https://raw.githubusercontent.com/libjxl/libjxl/v$LATEST/deps.sh | sed -n 's/^THIRD_PARTY_HIGHWAY="\([0-9a-f]*\)".*/\1/p') && V=$(git ls-remote --tags https://github.com/google/highway | awk -v c=$HWY '$1==c {sub("refs/tags/","",$2); sub("\\^\\{\\}","",$2); print $2}') && sed -i -E "s/^ARG HIGHWAY_VERSION=.*/ARG HIGHWAY_VERSION=$V/" Dockerfile && ./hashupdate Dockerfile HIGHWAY $V
-# bump: libjxl link "Changelog" https://github.com/libjxl/libjxl/blob/main/CHANGELOG.md
+FROM base AS highway
 # highway is the only third_party source of libjxl this build uses, pinned by libjxl deps.sh and bumped with libjxl
 # highway is built here as its static build is not available in alpine
 ARG HIGHWAY_VERSION=1.2.0
@@ -1270,9 +1284,16 @@ RUN \
     -DHWY_ENABLE_CONTRIB=OFF \
     -DHWY_ENABLE_EXAMPLES=OFF \
     -DHWY_ENABLE_TESTS=OFF && \
-  cmake --build build -j$(nproc) && \
+  cmake --build build -j$(nproc) -- -l$(nproc) && \
   cmake --install build
 
+# hard: -DJPEGXL_FORCE_SYSTEM_HWY=ON needs highway, -DJPEGXL_ENABLE_SKCMS=OFF needs lcms2
+FROM highway AS libjxl
+COPY --link --from=lcms2 /usr/local/ /usr/local/
+# bump: libjxl /LIBJXL_VERSION=([\d.]+)/ https://github.com/libjxl/libjxl.git|^0
+# bump: libjxl after ./hashupdate Dockerfile LIBJXL $LATEST
+# bump: libjxl after HWY=$(curl -sL https://raw.githubusercontent.com/libjxl/libjxl/v$LATEST/deps.sh | sed -n 's/^THIRD_PARTY_HIGHWAY="\([0-9a-f]*\)".*/\1/p') && V=$(git ls-remote --tags https://github.com/google/highway | awk -v c=$HWY '$1==c {sub("refs/tags/","",$2); sub("\\^\\{\\}","",$2); print $2}') && sed -i -E "s/^ARG HIGHWAY_VERSION=.*/ARG HIGHWAY_VERSION=$V/" Dockerfile && ./hashupdate Dockerfile HIGHWAY $V
+# bump: libjxl link "Changelog" https://github.com/libjxl/libjxl/blob/main/CHANGELOG.md
 ARG LIBJXL_VERSION=0.12.0
 ARG LIBJXL_URL="https://github.com/libjxl/libjxl/archive/refs/tags/v${LIBJXL_VERSION}.tar.gz"
 ARG LIBJXL_FILE="libjxl.$LIBJXL_VERSION.tar.gz"
@@ -1297,7 +1318,7 @@ RUN \
     -DJPEGXL_FORCE_SYSTEM_GTEST=ON \
     -DJPEGXL_FORCE_SYSTEM_BROTLI=ON \
     -DJPEGXL_FORCE_SYSTEM_HWY=ON && \
-  cmake --build build -j$(nproc) && \
+  cmake --build build -j$(nproc) -- -l$(nproc) && \
   cmake --install build && \
 # workaround for ffmpeg configure script
   sed -i 's/-ljxl/-ljxl -lstdc++ /' /usr/local/lib/pkgconfig/libjxl.pc && \
@@ -1324,7 +1345,7 @@ RUN \
     --disable-curve-keygen \
     --without-docs \
     --enable-static && \
-  make -j$(nproc) install && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$LIBZMQ_VERSION" > /usr/local/share/versions/libzmq
 
 FROM base AS vvenc
@@ -1347,7 +1368,7 @@ RUN \
     -DVVENC_ENABLE_LINK_TIME_OPT=OFF \
     $CMAKE_COMMON_FLAGS \
     -DCMAKE_INSTALL_PREFIX=/usr/local && \
-  cmake --build build/release-static -j$(nproc) && \
+  cmake --build build/release-static -j$(nproc) -- -l$(nproc) && \
   cmake --build build/release-static --target install && \
   echo "$VVENC_VERSION" > /usr/local/share/versions/libvvenc
 
@@ -1366,7 +1387,7 @@ RUN \
     --disable-dvb \
     --disable-proxy \
     --disable-nls && \
-  make -j$(nproc) -C src install && \
+  make -j$(nproc) -l$(nproc) -C src install && \
   make install-pkgconfigDATA
 
 FROM base AS builder
@@ -1375,6 +1396,7 @@ COPY --link --from=aom /usr/local/ /usr/local/
 COPY --link --from=libaribb24 /usr/local/ /usr/local/
 COPY --link --from=chromaprint /usr/local/ /usr/local/
 COPY --link --from=libass /usr/local/ /usr/local/
+COPY --link --from=librsvg /usr/local/ /usr/local/
 COPY --link --from=libbluray /usr/local/ /usr/local/
 COPY --link --from=davs2 /usr/local/ /usr/local/
 COPY --link --from=libdvdnav /usr/local/ /usr/local/
@@ -1398,6 +1420,7 @@ COPY --link --from=speex /usr/local/ /usr/local/
 COPY --link --from=srt /usr/local/ /usr/local/
 COPY --link --from=libssh /usr/local/ /usr/local/
 COPY --link --from=svtav1 /usr/local/ /usr/local/
+COPY --link --from=theora /usr/local/ /usr/local/
 COPY --link --from=vorbis /usr/local/ /usr/local/
 COPY --link --from=twolame /usr/local/ /usr/local/
 COPY --link --from=uavs3d /usr/local/ /usr/local/
@@ -1516,7 +1539,7 @@ RUN \
   --enable-libzvbi \
   --enable-openssl \
   || (cat ffbuild/config.log ; false) && \
-  make -j$(nproc) install
+  make -j$(nproc) -l$(nproc) install
 
 RUN \
   EXPAT_VERSION=$(pkg-config --modversion expat) \
