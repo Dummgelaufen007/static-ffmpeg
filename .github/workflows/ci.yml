@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - 'Dockerfile'
+      - '.github/workflows/**'
+  workflow_dispatch:
+    inputs:
+      dockerfile:
+        description: 'Dockerfile to build'
+        default: 'Dockerfile'
+        required: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.dockerfile || 'Dockerfile' }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runs_on: ubuntu-24.04
+          - arch: arm64
+            runs_on: ubuntu-24.04-arm
+    name: Build ${{ inputs.dockerfile || 'Dockerfile' }} ${{ matrix.arch }} (${{ matrix.runs_on }})
+    runs-on: ${{ matrix.runs_on }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        with:
+          buildkitd-flags: --oci-max-parallelism=4
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: ${{ inputs.dockerfile || 'Dockerfile' }}
+          push: false
+          build-args: |
+            DOCKERFILE=${{ inputs.dockerfile || 'Dockerfile' }}
+            ENABLE_FDKAAC=1
+            ENABLE_LIBDVDCSS=1
