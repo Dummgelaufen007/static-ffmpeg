@@ -1125,7 +1125,8 @@ RUN \
   make -j$(nproc) -l$(nproc) install && \
   echo "$X264_COMMIT" > /usr/local/share/versions/libx264
 
-FROM base AS x265
+# multilib.sh builds 12, 10 and 8 bit one after another and only its final ar step needs all three, so each bit depth gets its own stage
+FROM base AS x265-src
 # bump: x265 /X265_VERSION=([\d.]+)/ https://github.com/Multicorewareinc/x265.git|*
 # bump: x265 after ./hashupdate Dockerfile X265 $LATEST
 # bump: x265 link "Source diff $CURRENT..$LATEST" https://github.com/Multicorewareinc/x265/compare/$CURRENT..$LATEST
@@ -1133,20 +1134,64 @@ ARG X265_VERSION=4.3
 ARG X265_URL="https://github.com/Multicorewareinc/x265/releases/download/$X265_VERSION/x265_$X265_VERSION.tar.gz"
 ARG X265_FILE="x265.$X265_VERSION.tar.gz"
 ARG X265_SHA256=83c53e4c8bbb8f1e33ed59e10a7d621d1d7801ca853910c3eb41f038b8ffb121
-# CMAKEFLAGS issue
-# https://bitbucket.org/multicoreware/x265_git/issues/620/support-passing-cmake-flags-to-multilibsh
+ARG CMAKEFLAGS="-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DENABLE_ALPHA=ON $CMAKE_COMMON_FLAGS"
 ADD --checksum=sha256:$X265_SHA256 --unpack=true $X265_URL /
 RUN \
-  cd x265_*/build/linux && \
-  sed -i '/^cmake / s/$/ ${CMAKEFLAGS}/' ./multilib.sh && \
-  sed -i 's/ -DENABLE_SHARED=OFF//g' ./multilib.sh && \
-  # hdr10+ for the 10 and 12 bit builds only, 8 bit has no use for it
-  sed -i 's/-DHIGH_BIT_DEPTH=ON/& -DENABLE_HDR10_PLUS=ON/' ./multilib.sh && \
-  sed -i '1i #include <cstdint>' ../../source/dynamicHDR10/json11/json11.cpp && \
-  MAKEFLAGS="-j$(nproc) -l$(nproc)" \
-  CMAKEFLAGS="-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DENABLE_ALPHA=ON $CMAKE_COMMON_FLAGS" \
-  ./multilib.sh && \
-  make -C 8bit -j$(nproc) -l$(nproc) install && \
+  cd x265_$X265_VERSION/build/linux && \
+  mkdir -p 8bit 10bit 12bit && \
+  sed -i '1i #include <cstdint>' ../../source/dynamicHDR10/json11/json11.cpp
+
+FROM x265-src AS x265-12bit
+RUN \
+  cd /x265_$X265_VERSION/build/linux/12bit && \
+  grep -qxF 'cmake ../../../source -DHIGH_BIT_DEPTH=ON -DEXPORT_C_API=OFF -DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DMAIN12=ON' ../multilib.sh && \
+  cmake ../../../source \
+    -DHIGH_BIT_DEPTH=ON \
+    # hdr10+ needs 10 or 12 bit
+    -DENABLE_HDR10_PLUS=ON \
+    -DEXPORT_C_API=OFF \
+    -DENABLE_CLI=OFF \
+    -DMAIN12=ON \
+    $CMAKEFLAGS && \
+  make -j$(nproc) -l$(nproc)
+
+FROM x265-src AS x265-10bit
+RUN \
+  cd /x265_$X265_VERSION/build/linux/10bit && \
+  grep -qxF 'cmake ../../../source -DHIGH_BIT_DEPTH=ON -DEXPORT_C_API=OFF -DENABLE_SHARED=OFF -DENABLE_CLI=OFF' ../multilib.sh && \
+  cmake ../../../source \
+    -DHIGH_BIT_DEPTH=ON \
+    # hdr10+ needs 10 or 12 bit
+    -DENABLE_HDR10_PLUS=ON \
+    -DEXPORT_C_API=OFF \
+    -DENABLE_CLI=OFF \
+    $CMAKEFLAGS && \
+  make -j$(nproc) -l$(nproc)
+
+# the 8 bit archive is not linked, so the two links point nowhere until the x265 stage
+FROM x265-src AS x265-8bit
+RUN \
+  cd /x265_$X265_VERSION/build/linux/8bit && \
+  grep -qxF 'cmake ../../../source -DEXTRA_LIB="x265_main10.a;x265_main12.a" -DEXTRA_LINK_FLAGS=-L. -DLINKED_10BIT=ON -DLINKED_12BIT=ON' ../multilib.sh && \
+  ln -sf ../10bit/libx265.a libx265_main10.a && \
+  ln -sf ../12bit/libx265.a libx265_main12.a && \
+  cmake ../../../source \
+    -DEXTRA_LIB="x265_main10.a;x265_main12.a" \
+    -DEXTRA_LINK_FLAGS=-L. \
+    -DLINKED_10BIT=ON \
+    -DLINKED_12BIT=ON \
+    $CMAKEFLAGS && \
+  make -j$(nproc) -l$(nproc)
+
+FROM x265-src AS x265
+COPY --link --from=x265-12bit /x265_$X265_VERSION/build/linux/12bit/libx265.a /x265_$X265_VERSION/build/linux/12bit/
+COPY --link --from=x265-10bit /x265_$X265_VERSION/build/linux/10bit/libx265.a /x265_$X265_VERSION/build/linux/10bit/
+COPY --link --from=x265-8bit /x265_$X265_VERSION/build/linux/8bit/ /x265_$X265_VERSION/build/linux/8bit/
+RUN \
+  cd /x265_$X265_VERSION/build/linux/8bit && \
+  mv libx265.a libx265_main.a && \
+  printf 'CREATE libx265.a\nADDLIB libx265_main.a\nADDLIB libx265_main10.a\nADDLIB libx265_main12.a\nSAVE\nEND\n' | ar -M && \
+  make -j$(nproc) -l$(nproc) install && \
   echo "$X265_VERSION" > /usr/local/share/versions/libx265
 
 FROM base AS xavs2
