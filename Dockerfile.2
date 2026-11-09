@@ -81,7 +81,6 @@ ARG CFLAGS="-O3 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
 ARG CXXFLAGS="-O3 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
 ARG LDFLAGS="-Wl,-z,relro,-z,now"
 ARG CMAKE_COMMON_FLAGS="-DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_LIBDIR=lib"
-ENV CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" CMAKE_COMMON_FLAGS="$CMAKE_COMMON_FLAGS"
 RUN mkdir -p /usr/local/share/versions
 
 FROM base AS rust
