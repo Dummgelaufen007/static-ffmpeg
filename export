@@ -2,7 +2,7 @@ ARG IMAGE=static-ffmpeg-fdk
 
 FROM $IMAGE AS ffmpeg
 
-FROM alpine:3.20.3 AS packager
+FROM alpine:3.24.4 AS packager
 
 RUN apk add --no-cache tar xz
 
