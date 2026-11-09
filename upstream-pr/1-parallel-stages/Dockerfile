@@ -12,7 +12,6 @@ RUN apk add --no-cache $APK_OPTS \
   coreutils \
   pkgconfig \
   curl \
-  rust cargo cargo-c \
   openssl-dev openssl-libs-static \
   ca-certificates \
   bash \
@@ -69,6 +68,11 @@ ARG CURL_OPTS="--fail --location --retry 9 --retry-all-errors --connect-timeout 
 
 # --no-same-owner as we don't care about uid/gid even if we run as root. fixes invalid gid/uid issue.
 ARG TAR_OPTS="--no-same-owner --extract --file"
+
+# only librsvg and rav1e need rust, so the other stages do not wait for it
+FROM base AS rust
+ARG APK_OPTS
+RUN apk add --no-cache $APK_OPTS rust cargo cargo-c
 
 # hard: -DCONFIG_TUNE_VMAF=1 and the libvmaf.pc sed need vmaf
 FROM base AS aom
@@ -248,8 +252,9 @@ RUN \
   ninja -j$(nproc) -vC build install && \
   echo "$DAV1D_VERSION" > /usr/local/share/versions/libdav1d
 
-# hard: librsvg needs pango and, for -Davif=enabled, dav1d
-FROM pango AS librsvg
+# hard: librsvg needs rust, pango and, for -Davif=enabled, dav1d
+FROM rust AS librsvg
+COPY --from=pango /usr/local/ /usr/local/
 COPY --from=dav1d /usr/local/ /usr/local/
 # bump: librsvg /LIBRSVG_VERSION=([\d.]+)/ https://gitlab.gnome.org/GNOME/librsvg.git|^2
 # bump: librsvg after ./hashupdate Dockerfile LIBRSVG $LATEST
@@ -725,7 +730,7 @@ RUN \
   make -j$(nproc) install && \
   echo "$LIBRABBITMQ_VERSION" > /usr/local/share/versions/librabbitmq
 
-FROM base AS rav1e
+FROM rust AS rav1e
 # bump: rav1e /RAV1E_VERSION=([\d.]+)/ https://github.com/xiph/rav1e.git|/\d+\./|*
 # bump: rav1e after ./hashupdate Dockerfile RAV1E $LATEST
 # bump: rav1e link "Release notes" https://github.com/xiph/rav1e/releases/tag/v$LATEST
