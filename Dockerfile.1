@@ -2,10 +2,18 @@
 # bump: alpine /ALPINE_VERSION=alpine:([\d.]+)/ docker:alpine|^3
 # bump: alpine link "Release notes" https://alpinelinux.org/posts/Alpine-$LATEST-released.html
 ARG ALPINE_VERSION=alpine:3.24.4
-# autoreconf needs gettext-dev, whose libintl.h redirects gettext to libintl_ symbols; kept out of the builder so no other recipe compiles against it
-FROM $ALPINE_VERSION AS zvbi
+
+# Alpine Package Keeper options
 ARG APK_OPTS=""
-RUN apk add --no-cache $APK_OPTS autoconf automake libtool gettext-dev
+
+# fetches the package index once for every stage that installs packages
+FROM $ALPINE_VERSION AS apk-base
+ARG APK_OPTS
+RUN apk update $APK_OPTS
+
+# autoreconf needs gettext-dev, whose libintl.h redirects gettext to libintl_ symbols; kept out of the builder so no other recipe compiles against it
+FROM apk-base AS zvbi
+RUN apk add $APK_OPTS autoconf automake libtool gettext-dev
 # bump: zvbi /ZVBI_VERSION=([\d.]+)/ https://github.com/zapping-vbi/zvbi.git|*
 # bump: zvbi after ./hashupdate Dockerfile ZVBI $LATEST
 # bump: zvbi link "NEWS" https://github.com/zapping-vbi/zvbi/blob/main/NEWS
@@ -18,12 +26,9 @@ RUN \
   mv zvbi-* zvbi && cd zvbi && \
   autoreconf -fiv
 
-FROM $ALPINE_VERSION AS builder
+FROM apk-base AS builder
 
-# Alpine Package Keeper options
-ARG APK_OPTS=""
-
-RUN apk add --no-cache $APK_OPTS \
+RUN apk add $APK_OPTS \
   coreutils \
   pkgconfig \
   rust cargo cargo-c \

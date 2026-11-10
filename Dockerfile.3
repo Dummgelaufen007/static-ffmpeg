@@ -5,16 +5,20 @@ ARG ALPINE_VERSION=alpine:3.24.4
 ARG CURL_OPTS="--fail --location --retry 9 --retry-all-errors --connect-timeout 10"
 # --no-same-owner as we don't care about uid/gid even if we run as root. fixes invalid gid/uid issue.
 ARG TAR_OPTS="--no-same-owner --extract --file"
+# Alpine Package Keeper options
+ARG APK_OPTS=""
 
 FROM $ALPINE_VERSION AS alpine
+ARG APK_OPTS
 # over http, so a caching proxy passed as http_proxy can store the packages
-RUN [ -z "$http_proxy" ] || sed -i 's|^https:|http:|' /etc/apk/repositories
+RUN \
+  [ -z "$http_proxy" ] || sed -i 's|^https:|http:|' /etc/apk/repositories && \
+  apk update $APK_OPTS
 
 FROM scratch AS downloads
 
 FROM alpine AS downloader
-ARG APK_OPTS=""
-RUN apk add --no-cache $APK_OPTS bash curl git
+RUN apk add $APK_OPTS bash curl git
 COPY --link --from=downloads / /downloads/
 ARG DOCKERFILE=Dockerfile
 ARG ENABLE_FDKAAC=
@@ -25,8 +29,7 @@ RUN --mount=src=$DOCKERFILE,dst=/Dockerfile --mount=src=download.sh,dst=/downloa
 
 # autoreconf needs gettext-dev, whose libintl.h redirects gettext to libintl_ symbols; kept out of the builder so no other recipe compiles against it
 FROM alpine AS zvbi
-ARG APK_OPTS=""
-RUN apk add --no-cache $APK_OPTS autoconf automake libtool gettext-dev
+RUN apk add $APK_OPTS autoconf automake libtool gettext-dev
 # bump: zvbi /ZVBI_VERSION=([\d.]+)/ https://github.com/zapping-vbi/zvbi.git|*
 # bump: zvbi after ./hashupdate Dockerfile ZVBI $LATEST
 # bump: zvbi link "NEWS" https://github.com/zapping-vbi/zvbi/blob/main/NEWS
@@ -41,10 +44,7 @@ RUN --mount=from=downloader,src=/downloads/$ZVBI_FILE,dst=/$ZVBI_FILE \
 
 FROM alpine AS builder
 
-# Alpine Package Keeper options
-ARG APK_OPTS=""
-
-RUN apk add --no-cache $APK_OPTS \
+RUN apk add $APK_OPTS \
   coreutils \
   pkgconfig \
   curl \

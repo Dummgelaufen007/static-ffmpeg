@@ -9,10 +9,14 @@ ARG APK_OPTS=""
 ARG ENABLE_FDKAAC=
 ARG ENABLE_LIBDVDCSS=
 
+# fetches the package index once for every stage that installs packages
+FROM $ALPINE_VERSION AS apk-base
+ARG APK_OPTS
+RUN apk update $APK_OPTS
+
 # autoreconf needs gettext-dev, whose libintl.h redirects gettext to libintl_ symbols; kept out of the builder so no other recipe compiles against it
-FROM $ALPINE_VERSION AS zvbi
-ARG APK_OPTS=""
-RUN apk add --no-cache $APK_OPTS autoconf automake libtool gettext-dev
+FROM apk-base AS zvbi
+RUN apk add $APK_OPTS autoconf automake libtool gettext-dev
 # bump: zvbi /ZVBI_VERSION=([\d.]+)/ https://github.com/zapping-vbi/zvbi.git|*
 # bump: zvbi after ./hashupdate Dockerfile ZVBI $LATEST
 # bump: zvbi link "NEWS" https://github.com/zapping-vbi/zvbi/blob/main/NEWS
@@ -25,9 +29,8 @@ RUN \
   mv zvbi-* zvbi && cd zvbi && \
   autoreconf -fiv
 
-FROM $ALPINE_VERSION AS base
-ARG APK_OPTS
-RUN apk add --no-cache $APK_OPTS \
+FROM apk-base AS base
+RUN apk add $APK_OPTS \
   coreutils \
   pkgconfig \
   openssl-dev openssl-libs-static \
@@ -84,8 +87,7 @@ ARG CMAKE_COMMON_FLAGS="-DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -
 RUN mkdir -p /usr/local/share/versions
 
 FROM base AS rust
-ARG APK_OPTS
-RUN apk add --no-cache $APK_OPTS rust cargo cargo-c
+RUN apk add $APK_OPTS rust cargo cargo-c
 
 # hard: -DCONFIG_TUNE_VMAF=1 and the libvmaf.pc sed need vmaf
 FROM base AS aom
@@ -1436,7 +1438,6 @@ RUN \
   make install-pkgconfigDATA
 
 FROM base AS builder
-ARG APK_OPTS
 COPY --link --from=aom /usr/local/ /usr/local/
 COPY --link --from=chromaprint /usr/local/ /usr/local/
 COPY --link --from=davs2 /usr/local/ /usr/local/

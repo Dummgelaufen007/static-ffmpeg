@@ -5,11 +5,17 @@ ARG ALPINE_VERSION=alpine:3.24.4
 ARG CURL_OPTS="--fail --location --retry 9 --retry-all-errors --connect-timeout 10"
 # --no-same-owner as we don't care about uid/gid even if we run as root. fixes invalid gid/uid issue.
 ARG TAR_OPTS="--no-same-owner --extract --file"
+# Alpine Package Keeper options
+ARG APK_OPTS=""
+
+# fetches the package index once for every stage that installs packages
+FROM $ALPINE_VERSION AS apk-base
+ARG APK_OPTS
+RUN apk update $APK_OPTS
 
 # autoreconf needs gettext-dev, whose libintl.h redirects gettext to libintl_ symbols; kept out of the builder so no other recipe compiles against it
-FROM $ALPINE_VERSION AS zvbi
-ARG APK_OPTS=""
-RUN apk add --no-cache $APK_OPTS curl autoconf automake libtool gettext-dev
+FROM apk-base AS zvbi
+RUN apk add $APK_OPTS curl autoconf automake libtool gettext-dev
 # bump: zvbi /ZVBI_VERSION=([\d.]+)/ https://github.com/zapping-vbi/zvbi.git|*
 # bump: zvbi after ./hashupdate Dockerfile ZVBI $LATEST
 # bump: zvbi link "NEWS" https://github.com/zapping-vbi/zvbi/blob/main/NEWS
@@ -25,12 +31,9 @@ RUN \
   tar $TAR_OPTS $ZVBI_FILE && mv zvbi-* zvbi && cd zvbi && \
   autoreconf -fiv
 
-FROM $ALPINE_VERSION AS builder
+FROM apk-base AS builder
 
-# Alpine Package Keeper options
-ARG APK_OPTS=""
-
-RUN apk add --no-cache $APK_OPTS \
+RUN apk add $APK_OPTS \
   coreutils \
   pkgconfig \
   curl \

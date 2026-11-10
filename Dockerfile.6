@@ -9,9 +9,13 @@ ARG APK_OPTS=""
 ARG ENABLE_FDKAAC=
 ARG ENABLE_LIBDVDCSS=
 
+# fetches the package index once for every stage that installs packages
+FROM $ALPINE_VERSION AS apk-base
+ARG APK_OPTS
+RUN --mount=type=cache,target=/etc/apk/cache,sharing=locked apk update $APK_OPTS
+
 # autoreconf needs gettext-dev, whose libintl.h redirects gettext to libintl_ symbols; kept out of the builder so no other recipe compiles against it
-FROM $ALPINE_VERSION AS zvbi
-ARG APK_OPTS=""
+FROM apk-base AS zvbi
 RUN --mount=type=cache,target=/etc/apk/cache,sharing=locked apk add $APK_OPTS autoconf automake libtool gettext-dev
 # bump: zvbi /ZVBI_VERSION=([\d.]+)/ https://github.com/zapping-vbi/zvbi.git|*
 # bump: zvbi after ./hashupdate Dockerfile ZVBI $LATEST
@@ -25,8 +29,7 @@ RUN \
   mv zvbi-* zvbi && cd zvbi && \
   autoreconf -fiv
 
-FROM $ALPINE_VERSION AS base
-ARG APK_OPTS
+FROM apk-base AS base
 RUN --mount=type=cache,target=/etc/apk/cache,sharing=locked apk add $APK_OPTS \
   coreutils \
   pkgconfig \
