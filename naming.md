@@ -8,4 +8,3 @@
 | `Dockerfile.2` | `Dockerfile.1`    | `runbook-to-parallelizing.md`                                           |
 | `Dockerfile.3` | `Dockerfile`      | `runbook-for-caching.md`                                                |
 | `Dockerfile.4` | `Dockerfile.3`    | `runbook-to-parallelizing.md`                                           |
-| `Dockerfile.6` | `Dockerfile.2`    | apk cache mount; rust and x265 preparation inside the compiling stages  |
