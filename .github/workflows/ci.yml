@@ -13,9 +13,13 @@ on:
         description: 'Dockerfile to build'
         default: 'Dockerfile'
         required: true
+      parallelism:
+        description: 'BuildKit step limit, 0 for none'
+        default: '4'
+        required: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.dockerfile || 'Dockerfile' }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.dockerfile || 'Dockerfile' }}-${{ inputs.parallelism || '4' }}
   cancel-in-progress: true
 
 jobs:
@@ -35,7 +39,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         with:
-          buildkitd-flags: --oci-max-parallelism=4
+          buildkitd-flags: ${{ (inputs.parallelism || '4') != '0' && format('--oci-max-parallelism={0}', inputs.parallelism || '4') || '' }}
           driver-opts: |
             env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
             env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
