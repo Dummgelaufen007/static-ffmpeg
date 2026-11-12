@@ -1243,10 +1243,10 @@ RUN \
   cmake --build build -j$(nproc) && \
   cmake --install build
 
-ARG LIBJXL_VERSION=0.12.0
+ARG LIBJXL_VERSION=0.13.0
 ARG LIBJXL_URL="https://github.com/libjxl/libjxl/archive/refs/tags/v${LIBJXL_VERSION}.tar.gz"
 ARG LIBJXL_FILE="libjxl.$LIBJXL_VERSION.tar.gz"
-ARG LIBJXL_SHA256=03e9be69a30be4011f559da75328b6d7cea8ad921fabfbd551ce10bf45cdc992
+ARG LIBJXL_SHA256=24d18c9af2d1f5a17730b3f8d3f70a5c16e5ac303f5d9d5fe9dc00cf7ca82af2
 RUN \
   curl -o $LIBJXL_FILE $CURL_OPTS "$LIBJXL_URL" && \
   echo "$LIBJXL_SHA256  $LIBJXL_FILE" | sha256sum -c - && \
