@@ -3,7 +3,10 @@
 With this PR the four options every CMake recipe needs come from one `ARG CMAKE_COMMON_FLAGS`, like `CFLAGS`, `CXXFLAGS` and `LDFLAGS`: one place to set them, and every recipe gets the same ones.
 
 ```
--DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_LIBDIR=lib
+-DCMAKE_VERBOSE_MAKEFILE=ON 
+-DCMAKE_BUILD_TYPE=Release 
+-DBUILD_SHARED_LIBS=OFF 
+-DCMAKE_INSTALL_LIBDIR=lib
 ```
 
 ## Changes
