@@ -565,15 +565,10 @@ ARG LIBGSM_SHA256=a3c40c6471928383f4abfcb2e8f24012a1f562be2f17b8d672145d5986681a
 RUN --mount=from=downloader,src=/downloads/$LIBGSM_FILE,dst=/$LIBGSM_FILE \
   tar $TAR_OPTS /$LIBGSM_FILE && \
   cd gsm-* && \
-  # Makefile is hard to use, hence use specific compile arguments and flags
-  # no need to build toast cli tool \
-  rm src/toast* && \
-  SRC=$(echo src/*.c) && \
-  gcc ${CFLAGS} -c -ansi -pedantic -s -DNeedFunctionPrototypes=1 -Wall -Wno-comment -DSASR -DWAV49 -DNDEBUG -I./inc ${SRC} && \
-  ar cr libgsm.a *.o && ranlib libgsm.a && \
+  make -j$(nproc) -l$(nproc) lib/libgsm.a CCFLAGS="-c ${CFLAGS} -DNeedFunctionPrototypes=1 -Wall -Wno-comment -DNDEBUG" && \
   mkdir -p /usr/local/include/gsm && \
-  cp inc/*.h /usr/local/include/gsm && \
-  cp libgsm.a /usr/local/lib && \
+  cp inc/gsm.h /usr/local/include/gsm && \
+  cp lib/libgsm.a /usr/local/lib && \
   echo "$LIBGSM_VERSION" > /usr/local/share/versions/libgsm
 
 FROM base AS kvazaar
