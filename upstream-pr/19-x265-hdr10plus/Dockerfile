@@ -294,6 +294,22 @@ RUN \
   cmake --install build
 RUN echo "Libs.private: -lfftw3 -lstdc++" >> /usr/local/lib/pkgconfig/libchromaprint.pc
 
+# before libass, which uses it for unicode line breaking; alpine has no static build
+# bump: libunibreak /LIBUNIBREAK_VERSION=([\d.]+)/ gitrefs:https://github.com/adah1972/libunibreak.git|re:#^refs/tags/libunibreak_(\d+)_(\d+)$#${1}.${2}#|*
+# bump: libunibreak after sed -i -E "s#/libunibreak_[0-9_]+/#/libunibreak_$(echo $LATEST | tr . _)/#" Dockerfile && ./hashupdate Dockerfile LIBUNIBREAK $LATEST
+# bump: libunibreak link "NEWS" https://github.com/adah1972/libunibreak/blob/master/NEWS
+ARG LIBUNIBREAK_VERSION=8.0
+ARG LIBUNIBREAK_URL="https://github.com/adah1972/libunibreak/releases/download/libunibreak_8_0/libunibreak-$LIBUNIBREAK_VERSION.tar.gz"
+ARG LIBUNIBREAK_SHA256=9c4fad6e517338a098373acc9f35579ae2c325e6446666fb9ac2666ba15ceba4
+RUN \
+  curl $CURL_OPTS -o libunibreak.tar.gz "$LIBUNIBREAK_URL" && \
+  echo "$LIBUNIBREAK_SHA256  libunibreak.tar.gz" | sha256sum -c - && \
+  tar $TAR_OPTS libunibreak.tar.gz && cd libunibreak-* && \
+  ./configure \
+    --disable-shared \
+    --enable-static && \
+  make -j$(nproc) install
+
 # bump: libass /LIBASS_VERSION=([\d.]+)/ https://github.com/libass/libass.git|*
 # bump: libass after ./hashupdate Dockerfile LIBASS $LATEST
 # bump: libass link "Release notes" https://github.com/libass/libass/releases/tag/$LATEST
@@ -305,6 +321,7 @@ RUN \
   echo "$LIBASS_SHA256  libass.tar.gz" | sha256sum -c - && \
   tar $TAR_OPTS libass.tar.gz && cd libass-* && \
   ./configure \
+    --enable-libunibreak \
     --disable-shared \
     --enable-static && \
   make -j$(nproc) && make install
@@ -489,9 +506,9 @@ RUN \
 # bump: libmodplug /LIBMODPLUG_VERSION=([\d.]+)/ fetch:https://sourceforge.net/projects/modplug-xmms/files/|/libmodplug-([\d.]+).tar.gz/
 # bump: libmodplug after ./hashupdate Dockerfile LIBMODPLUG $LATEST
 # bump: libmodplug link "NEWS" https://sourceforge.net/p/modplug-xmms/git/ci/master/tree/libmodplug/NEWS
-ARG LIBMODPLUG_VERSION=0.8.9.0
+ARG LIBMODPLUG_VERSION=0.8.9.2
 ARG LIBMODPLUG_URL="https://downloads.sourceforge.net/modplug-xmms/libmodplug-$LIBMODPLUG_VERSION.tar.gz"
-ARG LIBMODPLUG_SHA256=457ca5a6c179656d66c01505c0d95fafaead4329b9dbaa0f997d00a3508ad9de
+ARG LIBMODPLUG_SHA256=e4d9cb46da78a639d6eadb4ff3ab955f68c3099579b5310af64b37091e28957e
 RUN \
   curl $CURL_OPTS -o libmodplug.tar.gz "$LIBMODPLUG_URL" && \
   echo "$LIBMODPLUG_SHA256  libmodplug.tar.gz" | sha256sum -c - && \
@@ -1021,11 +1038,9 @@ RUN \
   tar $TAR_OPTS x265.tar.gz && cd x265_*/build/linux && \
   sed -i '/^cmake / s/$/ -G "Unix Makefiles" ${CMAKEFLAGS}/' ./multilib.sh && \
   sed -i 's/ -DENABLE_SHARED=OFF//g' ./multilib.sh && \
-  # hdr10+ for the 10 and 12 bit builds only, 8 bit has no use for it
-  sed -i 's/-DHIGH_BIT_DEPTH=ON/& -DENABLE_HDR10_PLUS=ON/' ./multilib.sh && \
   sed -i '1i #include <cstdint>' ../../source/dynamicHDR10/json11/json11.cpp && \
   MAKEFLAGS="-j$(nproc)" \
-  CMAKEFLAGS="-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release" \
+  CMAKEFLAGS="-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DENABLE_ALPHA=ON -DENABLE_HDR10_PLUS=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release" \
   ./multilib.sh && \
   make -C 8bit -j$(nproc) install
 
@@ -1385,6 +1400,7 @@ RUN \
   libsvtav1: env.SVTAV1_VERSION, \
   libtheora: env.THEORA_VERSION, \
   libtwolame: env.TWOLAME_VERSION, \
+  libunibreak: env.LIBUNIBREAK_VERSION, \
   libuavs3d: env.UAVS3D_COMMIT, \
   libvidstab: env.VIDSTAB_VERSION, \
   libvmaf: env.VMAF_VERSION, \
