@@ -546,7 +546,7 @@ ARG LIBGSM_SHA256=a3c40c6471928383f4abfcb2e8f24012a1f562be2f17b8d672145d5986681a
 ADD --checksum=sha256:$LIBGSM_SHA256 --unpack=true $LIBGSM_URL /
 RUN \
   cd gsm-* && \
-  make -j$(nproc) -l$(nproc) lib/libgsm.a CCFLAGS="-c ${CFLAGS} -DNeedFunctionPrototypes=1 -Wall -Wno-comment -DNDEBUG" && \
+  make -j$(nproc) -l$(nproc) lib/libgsm.a CCFLAGS="-c ${CFLAGS} -DNDEBUG" && \
   mkdir -p /usr/local/include/gsm && \
   cp inc/gsm.h /usr/local/include/gsm && \
   cp lib/libgsm.a /usr/local/lib && \

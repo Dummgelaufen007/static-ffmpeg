@@ -534,7 +534,7 @@ RUN \
   curl -o $LIBGSM_FILE $CURL_OPTS "$LIBGSM_URL" && \
   echo "$LIBGSM_SHA256  $LIBGSM_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $LIBGSM_FILE && cd gsm-* && \
-  make -j$(nproc) lib/libgsm.a CCFLAGS="-c ${CFLAGS} -DNeedFunctionPrototypes=1 -Wall -Wno-comment -DNDEBUG" && \
+  make -j$(nproc) lib/libgsm.a CCFLAGS="-c ${CFLAGS} -DNDEBUG" && \
   mkdir -p /usr/local/include/gsm && \
   cp inc/gsm.h /usr/local/include/gsm && \
   cp lib/libgsm.a /usr/local/lib
