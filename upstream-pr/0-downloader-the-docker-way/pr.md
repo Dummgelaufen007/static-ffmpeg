@@ -37,8 +37,6 @@ RUN \
   git fetch --unshallow --filter=tree:0 origin +refs/heads/master:refs/remotes/origin/master && \
 ```
 
-**libmodplug and opencore-amr** now use the same sourceforge link form as lame (`.../download`), which `ADD` fetches reliably.
-
 **Other lines.** `CURL_OPTS` and `TAR_OPTS` go; `curl`, `tar` and `git` stay for libjxl `deps.sh`, x264 and uavs3d.
 
 ## What is given up
