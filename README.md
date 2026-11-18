@@ -8,11 +8,8 @@
 > - `Dockerfile` adds [libzvbi](https://github.com/zapping-vbi/zvbi) and
 >   [libopenmpt](https://lib.openmpt.org/libopenmpt/) to the libraries listed below.
 > - Enhancements:
->   - Unicode line breaking for libass subtitles
 >   - fixed ARIB caption decoding
->   - alpha and HDR10+ in x265
 >   - `tune=vmaf` in libaom without a model file
->   - faster AVS2 decoding and encoding
 > - The fork publishes no image. `mwader/static-ffmpeg` below is upstream's image.
 > - For a variant with a downloader stage, fill the source cache first with
 >   `./download.sh Dockerfile.<n>`.
