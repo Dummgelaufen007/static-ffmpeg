@@ -1,6 +1,6 @@
 # Add libzvbi
 
-Adds the `libzvbi_teletext` decoder: DVB teletext pages and subtitles to text or bitmap subtitles ([configure#L7510](https://github.com/FFmpeg/FFmpeg/blob/n9.0.2/configure#L7510)).
+Adds the `libzvbi_teletextdec` decoder: DVB teletext pages and subtitles to text or bitmap subtitles ([configure#L7510](https://github.com/FFmpeg/FFmpeg/blob/n9.0.2/configure#L7510)).
 
 ## Why zvbi gets a stage of its own
 
