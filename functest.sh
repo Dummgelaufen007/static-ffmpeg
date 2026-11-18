@@ -2,10 +2,27 @@
 
 set -uo pipefail
 
-ROOT=$(realpath "${1:?usage: $0 <entpacktes export-verzeichnis>}")
+problems=()
+for program in curl sha256sum timeout base64 dd od realpath mktemp head tail cat mkdir rm sleep grep sed; do
+    command -v "$program" >/dev/null || problems+=("missing: $program")
+done
+if command -v base64 >/dev/null && ! base64 -w0 </dev/null >/dev/null 2>&1; then
+    problems+=("base64 does not support -w0")
+fi
+if command -v dd >/dev/null && ! dd status=none count=0 </dev/null 2>/dev/null; then
+    problems+=("dd does not support status=none")
+fi
+if [[ ${#problems[@]} -gt 0 ]]; then
+    printf 'ERROR   %s\n' "${problems[@]}" >&2
+    exit 1
+fi
+
+ROOT=$(realpath "${1:?usage: $0 <unpacked export directory>}")
 WORST_CASE_SECONDS=120
 ARIB_SAMPLE=https://fate-suite.ffmpeg.org/sub/aribcaption_clear.ts
 ARIB_SHA256=a349fc7ade98e5e259ee1657aa8cb9db60e9b77b000376956482fd0270b358da
+TELETEXT_SAMPLE=https://trac.ffmpeg.org/raw-attachment/ticket/2188/test.ts
+TELETEXT_SHA256=80121f1503906c620d5c03755ddb6ccde9d47adf710958c018e4a57068aebcf9
 AVS3_SAMPLE=https://raw.githubusercontent.com/xatabhk/avs2-avs3-video-samples/f5e12f4540784fc6b16dd736caca9ffdac44b038/Raw/WindTurbines4_270_ffmepg.avs3
 AVS3_10BIT_SAMPLE=https://raw.githubusercontent.com/xatabhk/avs2-avs3-video-samples/f5e12f4540784fc6b16dd736caca9ffdac44b038/Raw/MarketPlace_480x270_60_10bit_ra_ffmpeg.avs3
 SOFA_SAMPLE=https://raw.githubusercontent.com/hoene/libmysofa/v1.3.5/tests/tester.sofa
@@ -39,7 +56,7 @@ result() {
     if [[ $2 -eq 0 ]]; then
         echo "ok      $1"
     else
-        echo "FEHLER  $1"
+        echo "FAIL    $1"
         failed+=("$1")
         tail -n 5 "$WORK/$1.log" | sed 's/^/    | /'
     fi
@@ -105,6 +122,20 @@ rsvg_avif() {
     ((red > 200 && green < 60 && blue < 60 && alpha == 255))
 }
 
+gray_decode() {
+    local chroma
+    ff -f lavfi -i color=c=red:size=64x64 -frames:v 1 -c:v libx264 red.h264 || return
+    ff -flags gray -i red.h264 -pix_fmt yuv420p -f rawvideo gray.yuv || return
+    chroma=$(od -An -tu1 -j 4096 -N 1 gray.yuv)
+    echo "chroma $chroma"
+    ((chroma == 128))
+}
+
+zvbi_decode() {
+    echo "$TELETEXT_SHA256  $WORK/ttx.ts" | sha256sum -c - || return
+    ff -txt_format text -c:s libzvbi_teletextdec -i ttx.ts -map 0:s:0 -f srt ttx.srt
+}
+
 aribb24_decode() {
     echo "$ARIB_SHA256  $WORK/arib.ts" | sha256sum -c - || return
     # aribb24 1.0.3 reads depth-0 DRCS patterns as 2 bpp and overruns the unit: skip the DRCS unit, replace its glyph by "AB"
@@ -134,7 +165,7 @@ printf '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><circle c
     printf '\x80%.0s' {1..16}
 } >"$WORK/tone.mod"
 mkdir "$WORK/nobd"
-for sample in hrtf.sofa:"$SOFA_SAMPLE" arib.ts:"$ARIB_SAMPLE" avs3.avs3:"$AVS3_SAMPLE" avs3_10bit.avs3:"$AVS3_10BIT_SAMPLE"; do
+for sample in hrtf.sofa:"$SOFA_SAMPLE" arib.ts:"$ARIB_SAMPLE" ttx.ts:"$TELETEXT_SAMPLE" avs3.avs3:"$AVS3_SAMPLE" avs3_10bit.avs3:"$AVS3_10BIT_SAMPLE"; do
     curl -fsSL -o "$WORK/${sample%%:*}" "${sample#*:}"
 done
 
@@ -171,6 +202,8 @@ check libjxl-anim-enc ff "${VSRC[@]}" -c:v libjxl_anim -f image2pipe anim.jxl
 check libjxl-anim-dec ff -c:v libjxl_anim -i anim.jxl -f null -
 check librsvg ff -c:v librsvg -i img.svg -f null -
 check librsvg-avif rsvg_avif
+check liboapv ff "${VSRC[@]}" -pix_fmt yuv422p10le -c:v liboapv -f null -
+check gray gray_decode
 check libsnappy ff "${VSRC[@]}" -c:v hap -compressor snappy hap.mov
 
 check libfdk-aac-enc ff "${ASRC[@]}" -c:a libfdk_aac fdk.aac
@@ -194,6 +227,8 @@ check libvorbis-enc ff "${ASRC[@]}" -c:a libvorbis vorbis.ogg
 check libvorbis-dec ff -c:a libvorbis -i vorbis.ogg -f null -
 check libgme ff -f libgme -i tone.vgm -t 0.1 -f null -
 check libmodplug ff -f libmodplug -i tone.mod -t 1 -f null -
+check libopenmpt ff -f libopenmpt -i tone.mod -t 1 -f null -
+check chromaprint ff "${ASRC[@]}" -f chromaprint chroma.txt
 
 check libsoxr ff "${ASRC[@]}" -af aresample=resampler=soxr -ar 44100 -f null -
 check librubberband ff "${ASRC[@]}" -af rubberband=tempo=1.5 -f null -
@@ -211,6 +246,7 @@ reject libunibreak "wasn't built with ASS_FEATURE_WRAP_UNICODE" ff "${VSRC[@]}" 
 check libass-prep ff -i sub.srt sub.ass
 check libass-ass-filter ff "${VSRC[@]}" -vf ass=sub.ass -f null -
 check libaribb24 aribb24_decode
+check libzvbi zvbi_decode
 check iconv iconv_recode
 check lcms2-filter ff "${VSRC[@]}" -vf setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,iccgen,iccdetect -f null -
 check lcms2-encode lcms2_embed
@@ -226,13 +262,14 @@ expect libssh 'Connection failed' fp sftp://127.0.0.1:1/none
 expect librabbitmq 'Error connecting to server' fp amqp://127.0.0.1:1
 expect librtmp 'failed to connect socket' fp rtmp://127.0.0.1:1/app/none
 expect libbluray 'bd_open\(\) failed|BluRay disc not detected' fp "bluray:$WORK/nobd"
+expect libdvdread-dvdnav 'Unable to open the (DVD-Video structure|VMG)' fp -f dvdvideo "$WORK/nobd"
 
 echo
 if [[ ${#failed[@]} -eq 0 ]]; then
-    echo "=== alle Tests ok"
+    echo "=== all tests ok"
     rm -rf "$WORK"
 else
-    echo "=== ${#failed[@]} fehlgeschlagen: ${failed[*]}"
+    echo "=== ${#failed[@]} failed: ${failed[*]}"
     echo "=== Logs: $WORK"
     exit 1
 fi
