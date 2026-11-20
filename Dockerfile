@@ -150,10 +150,10 @@ RUN \
 # bump: harfbuzz /LIBHARFBUZZ_VERSION=([\d.]+)/ https://github.com/harfbuzz/harfbuzz.git|*
 # bump: harfbuzz after ./hashupdate Dockerfile LIBHARFBUZZ $LATEST
 # bump: harfbuzz link "NEWS" https://github.com/harfbuzz/harfbuzz/blob/main/NEWS
-ARG LIBHARFBUZZ_VERSION=15.1.0
+ARG LIBHARFBUZZ_VERSION=15.2.0
 ARG LIBHARFBUZZ_URL="https://github.com/harfbuzz/harfbuzz/releases/download/$LIBHARFBUZZ_VERSION/harfbuzz-$LIBHARFBUZZ_VERSION.tar.xz"
 ARG LIBHARFBUZZ_FILE="libharfbuzz.$LIBHARFBUZZ_VERSION.tar.xz"
-ARG LIBHARFBUZZ_SHA256=0fc7c565443a5f4be7da65ac5ee5bd737d9b158dc908708b7689a0a5796b0c8d
+ARG LIBHARFBUZZ_SHA256=e2ec49090744383cdbe7df808c1cedaafba06a97be8dc4211fe546ba585f12cb
 RUN \
   curl -o $LIBHARFBUZZ_FILE $CURL_OPTS "$LIBHARFBUZZ_URL" && \
   echo "$LIBHARFBUZZ_SHA256  $LIBHARFBUZZ_FILE" | sha256sum -c - && \
@@ -1333,14 +1333,10 @@ RUN \
 # bump: ffmpeg after ./hashupdate Dockerfile FFMPEG $LATEST
 # bump: ffmpeg link "Changelog" https://github.com/FFmpeg/FFmpeg/blob/n$LATEST/Changelog
 # bump: ffmpeg link "Source diff $CURRENT..$LATEST" https://github.com/FFmpeg/FFmpeg/compare/n$CURRENT..n$LATEST
-ARG FFMPEG_VERSION=9.0.2
+ARG FFMPEG_VERSION=9.1
 ARG FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz"
 ARG FFMPEG_FILE="ffmpeg.$FFMPEG_VERSION.tar.xz"
-ARG FFMPEG_SHA256=8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e
-# openapv >= 1.1 API, in release/9.0 after 9.0.2
-ARG FFMPEG_OAPV_URL="https://github.com/FFmpeg/FFmpeg/commit/c54710db21c1827dbc3e47658a562525af0fe528.patch"
-ARG FFMPEG_OAPV_FILE="ffmpeg.oapv.patch"
-ARG FFMPEG_OAPV_SHA256=f773a85ec68f3b26e0b2ab3cddb7a304df5be8eb5c1887c9b627e23e782c7ec2
+ARG FFMPEG_SHA256=1a4d394ae63d190a526cd052eb4415c156b5c5e2df37efab41a7de0b8fde2433
 # sed changes --toolchain=hardened -pie to -static-pie
 #
 # ldflags stack-size=2097152 is to increase default stack size from 128KB (musl default) to something
@@ -1349,10 +1345,7 @@ ARG FFMPEG_OAPV_SHA256=f773a85ec68f3b26e0b2ab3cddb7a304df5be8eb5c1887c9b627e23e7
 RUN \
   curl -o $FFMPEG_FILE $CURL_OPTS "$FFMPEG_URL" && \
   echo "$FFMPEG_SHA256  $FFMPEG_FILE" | sha256sum -c - && \
-  curl -o $FFMPEG_OAPV_FILE $CURL_OPTS "$FFMPEG_OAPV_URL" && \
-  echo "$FFMPEG_OAPV_SHA256  $FFMPEG_OAPV_FILE" | sha256sum -c - && \
   tar $TAR_OPTS $FFMPEG_FILE && cd ffmpeg-* && \
-  patch -p1 < /$FFMPEG_OAPV_FILE && \
   FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-nonfree " ;else echo ""; fi) && \
   sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
   ./configure \
