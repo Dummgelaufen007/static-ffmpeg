@@ -87,6 +87,12 @@ RUN apk add $APK_OPTS \
   linux-headers \
   # needed by rubberband
   libsamplerate-dev libsamplerate-static \
+  # needed by curl
+  nghttp2-dev nghttp2-static \
+  nghttp3-dev nghttp3-static \
+  zstd-dev zstd-static \
+  libidn2-dev libidn2-static libunistring-static \
+  libpsl-dev libpsl-static \
   # needed by x265
   numactl-dev \
   # needed by ffmpeg
@@ -904,6 +910,71 @@ RUN --mount=from=downloader,src=/downloads/$LIBSSH_FILE,dst=/$LIBSSH_FILE \
   make -j$(nproc) -l$(nproc) install && \
   echo "$LIBSSH_VERSION" > /usr/local/share/versions/libssh
 
+# hard: --with-ngtcp2 needs ngtcp2
+FROM base AS libcurl
+# alpine's ngtcp2 only has the gnutls crypto backend, curl's HTTP/3 needs the openssl one
+# bump: ngtcp2 /NGTCP2_VERSION=([\d.]+)/ https://github.com/ngtcp2/ngtcp2.git|*
+# bump: ngtcp2 after ./hashupdate Dockerfile NGTCP2 $LATEST
+# bump: ngtcp2 link "Release notes" https://github.com/ngtcp2/ngtcp2/releases/tag/v$LATEST
+ARG NGTCP2_VERSION=1.26.0
+ARG NGTCP2_URL="https://github.com/ngtcp2/ngtcp2/releases/download/v$NGTCP2_VERSION/ngtcp2-$NGTCP2_VERSION.tar.xz"
+ARG NGTCP2_FILE="ngtcp2.$NGTCP2_VERSION.tar.xz"
+ARG NGTCP2_SHA256=7804aa0fa1c39942ba322a90805824c37231f7675b08d0c3cc4332858a7b085e
+RUN --mount=from=downloader,src=/downloads/$NGTCP2_FILE,dst=/$NGTCP2_FILE \
+  tar $TAR_OPTS /$NGTCP2_FILE && \
+  cd ngtcp2-* && \
+  ./configure \
+    --disable-shared \
+    --enable-static \
+    --enable-lib-only \
+    --with-openssl && \
+  make -j$(nproc) -l$(nproc) install && \
+  echo "$NGTCP2_VERSION" > /usr/local/share/versions/ngtcp2
+
+# bump: libcurl /LIBCURL_VERSION=([\d.]+)/ gitrefs:https://github.com/curl/curl.git|re:#^refs/tags/curl-(\d+)_(\d+)_(\d+)$#${1}.${2}.${3}#|*
+# bump: libcurl after ./hashupdate Dockerfile LIBCURL $LATEST
+# bump: libcurl link "Changelog" https://curl.se/ch/$LATEST.html
+ARG LIBCURL_VERSION=8.23.0
+ARG LIBCURL_URL="https://curl.se/download/curl-$LIBCURL_VERSION.tar.xz"
+ARG LIBCURL_FILE="libcurl.$LIBCURL_VERSION.tar.xz"
+ARG LIBCURL_SHA256=8dadd7d2536a314f982ad05a651b713f426bf7d02cc2c76cffb9796f2218e6c5
+# ffmpeg's libcurl protocol only speaks http and https
+RUN --mount=from=downloader,src=/downloads/$LIBCURL_FILE,dst=/$LIBCURL_FILE \
+  tar $TAR_OPTS /$LIBCURL_FILE && \
+  cd curl-* && \
+  ./configure \
+    --disable-shared \
+    --enable-static \
+    --with-openssl \
+    --with-ngtcp2 \
+    --with-nghttp3 \
+    --with-nghttp2 \
+    --with-zlib \
+    --with-brotli \
+    --with-zstd \
+    --with-libidn2 \
+    --with-libpsl \
+    --disable-dict \
+    --disable-file \
+    --disable-ftp \
+    --disable-gopher \
+    --disable-imap \
+    --disable-ipfs \
+    --disable-ldap \
+    --disable-mqtt \
+    --disable-pop3 \
+    --disable-rtsp \
+    --disable-smtp \
+    --disable-telnet \
+    --disable-tftp \
+    --disable-websockets \
+    --disable-docs \
+    --disable-manual && \
+  make -j$(nproc) -l$(nproc) -C lib install && \
+  make -C include install && \
+  make install-pkgconfigDATA && \
+  echo "$LIBCURL_VERSION" > /usr/local/share/versions/libcurl
+
 FROM base AS svtav1
 # bump: svtav1 /SVTAV1_VERSION=([\d.]+)/ https://gitlab.com/AOMediaCodec/SVT-AV1.git|*
 # bump: svtav1 after ./hashupdate Dockerfile SVTAV1 $LATEST
@@ -1459,6 +1530,7 @@ COPY --link --from=kvazaar /usr/local/ /usr/local/
 COPY --link --from=libaribb24 /usr/local/ /usr/local/
 COPY --link --from=libass /usr/local/ /usr/local/
 COPY --link --from=libbluray /usr/local/ /usr/local/
+COPY --link --from=libcurl /usr/local/ /usr/local/
 COPY --link --from=libdvdnav /usr/local/ /usr/local/
 COPY --link --from=libgme /usr/local/ /usr/local/
 COPY --link --from=libgsm /usr/local/ /usr/local/
@@ -1515,7 +1587,7 @@ ARG FFMPEG_SHA256=1a4d394ae63d190a526cd052eb4415c156b5c5e2df37efab41a7de0b8fde24
 RUN --mount=from=downloader,src=/downloads/$FFMPEG_FILE,dst=/$FFMPEG_FILE \
   tar $TAR_OPTS /$FFMPEG_FILE && \
   cd ffmpeg-* && \
-  FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-nonfree " ;else echo ""; fi) && \
+  FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-libfdk-xhe-aac --enable-nonfree " ;else echo ""; fi) && \
   sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
   ./configure \
   --pkg-config-flags="--static" \
@@ -1538,6 +1610,7 @@ RUN --mount=from=downloader,src=/downloads/$FFMPEG_FILE,dst=/$FFMPEG_FILE \
   --enable-libaribb24 \
   --enable-libass \
   --enable-libbluray \
+  --enable-libcurl \
   --enable-libdav1d \
   --enable-libdavs2 \
   --enable-libdvdnav \
@@ -1604,6 +1677,8 @@ RUN \
   LIBSAMPLERATE_VERSION=$(pkg-config --modversion samplerate) \
   LIBVO_AMRWBENC_VERSION=$(pkg-config --modversion vo-amrwbenc) \
   LIBXML2_VERSION=$(pkg-config --modversion libxml-2.0) \
+  NGHTTP2_VERSION=$(pkg-config --modversion libnghttp2) \
+  NGHTTP3_VERSION=$(pkg-config --modversion libnghttp3) \
   OPENSSL_VERSION=$(pkg-config --modversion openssl) \
   PCRE2_VERSION=$(pkg-config --modversion libpcre2-8) \
   PIXMAN_VERSION=$(pkg-config --modversion pixman-1) \
@@ -1625,6 +1700,8 @@ RUN \
   libvo_amrwbenc: env.LIBVO_AMRWBENC_VERSION, \
   libxml2: env.LIBXML2_VERSION, \
   libzvbi: env.ZVBI_VERSION, \
+  nghttp2: env.NGHTTP2_VERSION, \
+  nghttp3: env.NGHTTP3_VERSION, \
   openssl: env.OPENSSL_VERSION, \
   pcre2: env.PCRE2_VERSION, \
   pixman: env.PIXMAN_VERSION, \
