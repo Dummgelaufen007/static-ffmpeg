@@ -1,12 +1,19 @@
 # Add libcurl
 
-ffmpeg 9.1 has a new `libcurl` protocol, an alternative to the native `http`/`https`. It runs all connections of one input, such as the segments of an HLS stream, on a shared libcurl event loop, so they reuse connections and can multiplex over HTTP/2 and HTTP/3. The native protocol stays the default. libcurl is used with a `libcurl:` URL prefix or with `-prefer_libcurl 1` ([protocols.texi#L1115-L1126](https://github.com/FFmpeg/FFmpeg/blob/n9.1/doc/protocols.texi#L1115-L1126)).
+ffmpeg 9.1 has a new `libcurl` protocol next to the native `http`/`https`. The native protocol stays the default; libcurl is used with a `libcurl:` URL prefix or with `-prefer_libcurl 1` ([protocols.texi#L1115-L1126](https://github.com/FFmpeg/FFmpeg/blob/n9.1/doc/protocols.texi#L1115-L1126)).
 
-## Why curl is built instead of taken from apk
+## What it adds
 
-Alpine's `curl-static` links statically, but it is built without HTTP/3. curl's HTTP/3 with OpenSSL goes through ngtcp2's OpenSSL backend, which needs OpenSSL 3.5 or newer ([HTTP3.md#L52](https://github.com/curl/curl/blob/curl-8_23_0/docs/HTTP3.md#L52)). Alpine's `ngtcp2-static` only ships the gnutls backend ([package contents](https://pkgs.alpinelinux.org/contents?name=ngtcp2-static&branch=v3.24&arch=aarch64)), so ngtcp2 is built against Alpine's OpenSSL 3.5. ffmpeg only uses curl for `http` and `https`, so curl is built without its other protocols.
+Compared with the native protocol, which uses HTTP/1.1, requests no compression and takes only `http://` proxies:
 
-libcurl is autodetected ([configure#L7241](https://github.com/FFmpeg/FFmpeg/blob/n9.1/configure#L7241)), so without `--enable-libcurl` a missing dependency drops the protocol without an error.
+- HTTP/2 over HTTPS by default, HTTP/3 with `-http_version 3` ([libcurl.c#L1819-L1827](https://github.com/FFmpeg/FFmpeg/blob/n9.1/libavformat/libcurl.c#L1819-L1827))
+- shared connections and multiplexing for all requests of one input, such as HLS segments
+- gzip, brotli and zstd compression
+- HSTS and HTTPS proxies
+
+## Build
+
+curl is built with ngtcp2 and nghttp3 for HTTP/3, and only with `http` and `https`, which is all ffmpeg uses. libcurl is autodetected ([configure#L7241](https://github.com/FFmpeg/FFmpeg/blob/n9.1/configure#L7241)), so without `--enable-libcurl` a missing dependency drops the protocol without an error.
 
 ## Changes
 
