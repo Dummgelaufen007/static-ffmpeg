@@ -16,20 +16,20 @@ Use `mwader/static-ffmpeg` from [Docker Hub](https://hub.docker.com/r/mwader/sta
 
 In Dockerfile
 ```Dockerfile
-COPY --from=mwader/static-ffmpeg:9.0.2-1 /ffmpeg /usr/local/bin/
-COPY --from=mwader/static-ffmpeg:9.0.2-1 /ffprobe /usr/local/bin/
+COPY --from=mwader/static-ffmpeg:9.1 /ffmpeg /usr/local/bin/
+COPY --from=mwader/static-ffmpeg:9.1 /ffprobe /usr/local/bin/
 ```
 
 Run directly
 ```sh
-docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" mwader/static-ffmpeg:9.0.2-1 -i file.wav file.mp3
-docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" --entrypoint=/ffprobe mwader/static-ffmpeg:9.0.2-1 -i file.wav
+docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" mwader/static-ffmpeg:9.1 -i file.wav file.mp3
+docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" --entrypoint=/ffprobe mwader/static-ffmpeg:9.1 -i file.wav
 ```
 
 As shell alias
 ```sh
-alias ffmpeg='docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" mwader/static-ffmpeg:9.0.2-1'
-alias ffprobe='docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" --entrypoint=/ffprobe mwader/static-ffmpeg:9.0.2-1'
+alias ffmpeg='docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" mwader/static-ffmpeg:9.1'
+alias ffprobe='docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" --entrypoint=/ffprobe mwader/static-ffmpeg:9.1'
 ```
 
 ### Libraries
@@ -43,12 +43,13 @@ alias ffprobe='docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" --ent
 - [libaribb24](https://github.com/nkoriyama/aribb24)
 - [libass](https://github.com/libass/libass)
 - [libbluray](https://www.videolan.org/developers/libbluray.html)
+- [libcurl](https://curl.se/libcurl/)
 - [libdav1d](https://code.videolan.org/videolan/dav1d)
 - [libdavs2](https://github.com/pkuvcl/davs2)
 - [libdvdcss](https://code.videolan.org/videolan/libdvdcss) (only if explicitly enabled during build, [see below](#libdvdcss))
 - [libdvdnav](https://code.videolan.org/videolan/libdvdnav)
 - [libdvdread](https://code.videolan.org/videolan/libdvdread)
-- [libfdk-aac](https://github.com/mstorsjo/fdk-aac) (only if explicitly enabled during build, [see below](#libfdk-aac))
+- [libfdk-aac](https://github.com/mstorsjo/fdk-aac) with libfdk-xhe-aac (only if explicitly enabled during build, [see below](#libfdk-aac))
 - [libfreetype](https://freetype.org/)
 - [libfribidi](https://github.com/fribidi/fribidi)
 - [libgme](https://github.com/mcfiredrill/libgme)
@@ -131,7 +132,7 @@ docker build --build-arg ENABLE_LIBDVDCSS=1 . -t my-ffmpeg-static:latest
 ```
 
 ### libfdk-aac
-Due to license issues the docker image does not include libfdk-aac by default. A docker image including libfdk-aac can be built by passing a non empty value to the build-arg `ENABLE_FDKAAC`, example below.
+Due to license issues the docker image does not include libfdk-aac and libfdk-xhe-aac by default. A docker image including both can be built by passing a non empty value to the build-arg `ENABLE_FDKAAC`, example below.
 ```
 docker build --build-arg ENABLE_FDKAAC=1 . -t my-ffmpeg-static:latest
 ```
@@ -165,8 +166,8 @@ EOF
 2. Copy the `ffmpeg` (and `ffprobe`) binaries.
 
 ```Dockerfile
-COPY --from=mwader/static-ffmpeg:9.0.2-1 /ffmpeg /usr/bin/
-COPY --from=mwader/static-ffmpeg:9.0.2-1 /ffprobe /usr/bin/
+COPY --from=mwader/static-ffmpeg:9.1 /ffmpeg /usr/bin/
+COPY --from=mwader/static-ffmpeg:9.1 /ffprobe /usr/bin/
 ```
 
 3. Make sure the `/app/fonts` directory exist in your image.
@@ -195,8 +196,8 @@ EOF
 
 FROM base as ffmpeg
 
-COPY --from=mwader/static-ffmpeg:9.0.2-1 /ffmpeg /usr/bin/
-COPY --from=mwader/static-ffmpeg:9.0.2-1 /ffprobe /usr/bin/
+COPY --from=mwader/static-ffmpeg:9.1 /ffmpeg /usr/bin/
+COPY --from=mwader/static-ffmpeg:9.1 /ffprobe /usr/bin/
 
 FROM ffmpeg AS app
 
