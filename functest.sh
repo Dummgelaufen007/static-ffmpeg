@@ -180,6 +180,7 @@ check libx264rgb ff "${VSRC[@]}" -c:v libx264rgb -f null -
 check libx265 ff "${VSRC[@]}" -c:v libx265 -f null -
 check libx265-alpha ff "${VSRC[@]}" -vf format=yuva420p -c:v libx265 -f null -
 check libx265-hdr10plus x265_hdr10plus
+check libx265-12bit ff "${VSRC[@]}" -pix_fmt yuv420p12le -c:v libx265 -f null -
 check libkvazaar ff "${VSRC[@]}" -c:v libkvazaar -f null -
 check libxavs2 ff "${VSRC[@]}" -c:v libxavs2 -f avs2 avs2.avs2
 check libdavs2 ff -f avs2 -c:v libdavs2 -i avs2.avs2 -f null -
@@ -193,6 +194,8 @@ check libvpx-vp8-enc ff "${VSRC[@]}" -c:v libvpx vp8.webm
 check libvpx-vp8-dec ff -c:v libvpx -i vp8.webm -f null -
 check libvpx-vp9-enc ff "${VSRC[@]}" -c:v libvpx-vp9 vp9.webm
 check libvpx-vp9-dec ff -c:v libvpx-vp9 -i vp9.webm -f null -
+check libvpx-vp9-10bit-enc ff "${VSRC[@]}" -pix_fmt yuv420p10le -c:v libvpx-vp9 vp9_10bit.webm
+check libvpx-vp9-10bit-dec ff -c:v libvpx-vp9 -i vp9_10bit.webm -f null -
 check libopenjpeg ff "${VSRC[@]}" -c:v libopenjpeg -frames:v 1 -update 1 image.jp2
 check libwebp ff "${VSRC[@]}" -c:v libwebp -frames:v 1 image.webp
 check libwebpmux ff "${VSRC[@]}" -c:v libwebp_anim anim.webp
@@ -208,6 +211,8 @@ check libsnappy ff "${VSRC[@]}" -c:v hap -compressor snappy hap.mov
 
 check libfdk-aac-enc ff "${ASRC[@]}" -c:a libfdk_aac fdk.aac
 check libfdk-aac-dec ff -c:a libfdk_aac -i fdk.aac -f null -
+check libfdk-xhe-aac-enc ff "${ASRC[@]}" -c:a libfdk_xhe_aac xhe.m4a
+expect libfdk-xhe-aac-profile 'profile=xHE-AAC' fp -show_streams xhe.m4a
 check libgsm-enc ff "${ASRC[@]}" -ar 8000 -c:a libgsm gsm.gsm
 check libgsm-dec ff -c:a libgsm -i gsm.gsm -f null -
 check libgsm-ms-enc ff "${ASRC[@]}" -ar 8000 -c:a libgsm_ms gsm_ms.wav
@@ -254,6 +259,8 @@ check lcms2-encode lcms2_embed
 check dash-prep ff "${VSRC[@]}" -c:v libx264 -f dash stream.mpd
 check libxml2-dash ff -i stream.mpd -f null -
 check openssl fp -ca_file "$ROOT/etc/ssl/cert.pem" -i https://github.com/favicon.ico
+check libcurl fp -ca_file "$ROOT/etc/ssl/cert.pem" -i libcurl:https://github.com/favicon.ico
+check libcurl-http3 fp -ca_file "$ROOT/etc/ssl/cert.pem" -http_version 3only -i libcurl:https://www.cloudflare.com/favicon.ico
 check libsrt pair "srt://127.0.0.1:9000?mode=listener" "srt://127.0.0.1:9000"
 check libzmq pair zmq:tcp://127.0.0.1:5555 zmq:tcp://127.0.0.1:5555
 check libzmq-zmq-filter ff "${VSRC[@]}" -vf "zmq=b='tcp\://127.0.0.1\:5556'" -f null -
