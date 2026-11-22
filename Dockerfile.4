@@ -1254,8 +1254,8 @@ RUN \
     $CMAKEFLAGS && \
   make -j$(nproc) -l$(nproc)
 
-# the 8 bit archive is not linked, so the two links point nowhere until the x265 stage
-FROM x265-src AS x265-8bit
+# the 8 bit archive is not linked, so the two links point nowhere until the last RUN mounts them
+FROM x265-src AS x265
 RUN \
   cd /x265_$X265_VERSION/build/linux/8bit && \
   grep -qxF 'cmake ../../../source -DEXTRA_LIB="x265_main10.a;x265_main12.a" -DEXTRA_LINK_FLAGS=-L. -DLINKED_10BIT=ON -DLINKED_12BIT=ON' ../multilib.sh && \
@@ -1268,12 +1268,9 @@ RUN \
     -DLINKED_12BIT=ON \
     $CMAKEFLAGS && \
   make -j$(nproc) -l$(nproc)
-
-FROM x265-src AS x265
-COPY --link --from=x265-12bit /x265_$X265_VERSION/build/linux/12bit/libx265.a /x265_$X265_VERSION/build/linux/12bit/
-COPY --link --from=x265-10bit /x265_$X265_VERSION/build/linux/10bit/libx265.a /x265_$X265_VERSION/build/linux/10bit/
-COPY --link --from=x265-8bit /x265_$X265_VERSION/build/linux/8bit/ /x265_$X265_VERSION/build/linux/8bit/
 RUN \
+  --mount=from=x265-12bit,src=/x265_$X265_VERSION/build/linux/12bit/libx265.a,dst=/x265_$X265_VERSION/build/linux/12bit/libx265.a \
+  --mount=from=x265-10bit,src=/x265_$X265_VERSION/build/linux/10bit/libx265.a,dst=/x265_$X265_VERSION/build/linux/10bit/libx265.a \
   cd /x265_$X265_VERSION/build/linux/8bit && \
   mv libx265.a libx265_main.a && \
   printf 'CREATE libx265.a\nADDLIB libx265_main.a\nADDLIB libx265_main10.a\nADDLIB libx265_main12.a\nSAVE\nEND\n' | ar -M && \
