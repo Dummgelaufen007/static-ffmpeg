@@ -5,8 +5,7 @@
 > developed independently. Changes that fit upstream are sent there as pull requests.
 >
 > - The fork's work lives in `Dockerfile` and its `Dockerfile.*` variants, listed in [naming.md](naming.md).
-> - `Dockerfile` adds [libzvbi](https://github.com/zapping-vbi/zvbi) and
->   [libopenmpt](https://lib.openmpt.org/libopenmpt/) to the libraries listed below.
+> - `Dockerfile` adds [libopenmpt](https://lib.openmpt.org/libopenmpt/) to the libraries listed below.
 > - Enhancements:
 >   - fixed ARIB caption decoding
 >   - `tune=vmaf` in libaom without a model file
@@ -113,6 +112,7 @@ alias ffprobe='docker run -i --rm -u $UID:$GROUPS -v "$PWD:$PWD" -w "$PWD" --ent
 - [libxvid](https://labs.xvid.com)
 - [libzimg](https://github.com/sekrit-twc/zimg)
 - [libzmq](https://github.com/zeromq/libzmq)
+- [libzvbi](https://github.com/zapping-vbi/zvbi)
 - [openssl](https://openssl.org)
 - and all native ffmpeg codecs, formats, filters etc.
 

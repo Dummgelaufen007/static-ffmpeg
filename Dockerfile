@@ -19,10 +19,10 @@ RUN apk add $APK_OPTS curl autoconf automake libtool gettext-dev
 # bump: zvbi /ZVBI_VERSION=([\d.]+)/ https://github.com/zapping-vbi/zvbi.git|*
 # bump: zvbi after ./hashupdate Dockerfile ZVBI $LATEST
 # bump: zvbi link "NEWS" https://github.com/zapping-vbi/zvbi/blob/main/NEWS
-ARG ZVBI_VERSION=0.2.45
+ARG ZVBI_VERSION=0.2.46
 ARG ZVBI_URL="https://github.com/zapping-vbi/zvbi/archive/refs/tags/v$ZVBI_VERSION.tar.gz"
 ARG ZVBI_FILE="zvbi.$ZVBI_VERSION.tar.gz"
-ARG ZVBI_SHA256=e6c954fde2a5a635187f19e1ab870a88c1a982012c5f1b33b8f2513e0ab7a50e
+ARG ZVBI_SHA256=817a26118e2654155ee761cd39414885986a4315fdb6617af5314090ddfffd10
 ARG CURL_OPTS
 ARG TAR_OPTS
 RUN \
