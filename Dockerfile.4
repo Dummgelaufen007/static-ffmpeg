@@ -1400,7 +1400,7 @@ RUN --mount=from=downloader,src=/downloads/$LCMS2_FILE,dst=/$LCMS2_FILE \
   make -j$(nproc) -l$(nproc) install && \
   echo "$LCMS2_VERSION" > /usr/local/share/versions/lcms2
 
-FROM base AS highway
+FROM base AS libjxl
 # highway is the only third_party source of libjxl this build uses, pinned by libjxl deps.sh and bumped with libjxl
 # highway is built here as its static build is not available in alpine
 ARG HIGHWAY_VERSION=1.2.0
@@ -1417,9 +1417,7 @@ RUN --mount=from=downloader,src=/downloads/$HIGHWAY_FILE,dst=/$HIGHWAY_FILE \
     -DHWY_ENABLE_TESTS=OFF && \
   cmake --build build -j$(nproc) -- -l$(nproc) && \
   cmake --install build
-
 # hard: -DJPEGXL_FORCE_SYSTEM_HWY=ON needs highway, -DJPEGXL_ENABLE_SKCMS=OFF needs lcms2
-FROM highway AS libjxl
 COPY --link --from=lcms2 /usr/local/ /usr/local/
 # bump: libjxl /LIBJXL_VERSION=([\d.]+)/ https://github.com/libjxl/libjxl.git|^0
 # bump: libjxl after ./hashupdate Dockerfile LIBJXL $LATEST
