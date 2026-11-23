@@ -1,0 +1,273 @@
+# syntax=docker/dockerfile:1
+# bump: alpine /ALPINE_VERSION=alpine:([\d.]+)/ docker:alpine|^3
+# bump: alpine link "Release notes" https://alpinelinux.org/posts/Alpine-$LATEST-released.html
+ARG ALPINE_VERSION=alpine:3.24.4
+
+# Alpine Package Keeper options
+ARG APK_OPTS=""
+
+ARG ENABLE_FDKAAC=
+
+FROM $ALPINE_VERSION AS base
+ARG APK_OPTS
+RUN apk add $APK_OPTS \
+  pkgconfig \
+  build-base \
+  autoconf automake \
+  libtool \
+  nasm \
+  jq \
+  zlib-dev zlib-static \
+  soxr-dev soxr-static
+
+# -O3 makes sure we compile with optimization. setting CFLAGS/CXXFLAGS seems to override
+# default automake cflags.
+# -static-libgcc is needed to make gcc not include gcc_s as "as-needed" shared library which
+# cmake will include as a implicit library.
+# other options to get hardened build (same as ffmpeg hardened)
+ARG CFLAGS="-O3 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
+ARG CXXFLAGS="-O3 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
+ARG LDFLAGS="-Wl,-z,relro,-z,now"
+RUN mkdir -p /usr/local/share/versions
+
+FROM base AS fdk-aac
+# bump: fdk-aac /FDK_AAC_VERSION=([\d.]+)/ https://github.com/mstorsjo/fdk-aac.git|*
+# bump: fdk-aac after ./hashupdate Dockerfile FDK_AAC $LATEST
+# bump: fdk-aac link "ChangeLog" https://github.com/mstorsjo/fdk-aac/blob/master/ChangeLog
+# bump: fdk-aac link "Source diff $CURRENT..$LATEST" https://github.com/mstorsjo/fdk-aac/compare/v$CURRENT..v$LATEST
+ARG FDK_AAC_VERSION=3.0.0
+ARG FDK_AAC_URL="https://github.com/mstorsjo/fdk-aac/archive/v$FDK_AAC_VERSION.tar.gz"
+ARG FDK_AAC_FILE="fdk-aac.$FDK_AAC_VERSION.tar.gz"
+ARG FDK_AAC_SHA256=8538ea8f0f9915e460c106a13e1866a9e13c7ee48c1b67d0b2cf7b4e8159bd1a
+ARG ENABLE_FDKAAC
+ADD --checksum=sha256:$FDK_AAC_SHA256 --unpack=true $FDK_AAC_URL /
+RUN \
+  if [[ -n "$ENABLE_FDKAAC" ]]; then \
+  cd fdk-aac-* && \
+  ./autogen.sh && \
+  ./configure \
+    --disable-shared \
+    --enable-static && \
+  make -j$(nproc) -l$(nproc) install && \
+  echo "$FDK_AAC_VERSION" > /usr/local/share/versions/libfdk-aac; \
+  fi
+
+FROM base AS mp3lame
+# bump: mp3lame /MP3LAME_VERSION=([\d.]+)/ svn:http://svn.code.sf.net/p/lame/svn|/^RELEASE__(.*)$/|/_/./|*
+# bump: mp3lame after ./hashupdate Dockerfile MP3LAME $LATEST
+# bump: mp3lame link "ChangeLog" http://svn.code.sf.net/p/lame/svn/trunk/lame/ChangeLog
+ARG MP3LAME_VERSION=4.0
+ARG MP3LAME_URL="https://downloads.sourceforge.net/project/lame/lame/$MP3LAME_VERSION/lame-$MP3LAME_VERSION.tar.gz"
+ARG MP3LAME_FILE="mp3lame.$MP3LAME_VERSION.tar.gz"
+ARG MP3LAME_SHA256=3df5124d5ad3a98312ffd7ba6a9b36230e4f8a3e66d3ce0f425e336c32d216eb
+ADD --checksum=sha256:$MP3LAME_SHA256 --unpack=true $MP3LAME_URL /
+RUN \
+  cd lame-* && \
+  ./configure \
+    --disable-shared \
+    --enable-static \
+    --enable-nasm \
+    --disable-gtktest \
+    --disable-cpml \
+    --disable-decoder \
+    --disable-frontend && \
+  make -j$(nproc) -l$(nproc) install && \
+  echo "$MP3LAME_VERSION" > /usr/local/share/versions/libmp3lame
+
+FROM base AS opus
+# bump: opus /OPUS_VERSION=([\d.]+)/ https://github.com/xiph/opus.git|^1
+# bump: opus after ./hashupdate Dockerfile OPUS $LATEST
+# bump: opus link "Release notes" https://github.com/xiph/opus/releases/tag/v$LATEST
+# bump: opus link "Source diff $CURRENT..$LATEST" https://github.com/xiph/opus/compare/v$CURRENT..v$LATEST
+ARG OPUS_VERSION=1.6.1
+ARG OPUS_URL="https://downloads.xiph.org/releases/opus/opus-$OPUS_VERSION.tar.gz"
+ARG OPUS_FILE="opus.$OPUS_VERSION.tar.gz"
+ARG OPUS_SHA256=6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1
+ADD --checksum=sha256:$OPUS_SHA256 --unpack=true $OPUS_URL /
+RUN \
+  cd opus-* && \
+  ./configure \
+    --disable-shared \
+    --enable-static \
+    --disable-extra-programs \
+    --disable-doc && \
+  make -j$(nproc) -l$(nproc) install && \
+  echo "$OPUS_VERSION" > /usr/local/share/versions/libopus
+
+FROM base AS ogg
+# bump: ogg /OGG_VERSION=([\d.]+)/ https://github.com/xiph/ogg.git|*
+# bump: ogg after ./hashupdate Dockerfile OGG $LATEST
+# bump: ogg link "CHANGES" https://github.com/xiph/ogg/blob/master/CHANGES
+# bump: ogg link "Source diff $CURRENT..$LATEST" https://github.com/xiph/ogg/compare/v$CURRENT..v$LATEST
+ARG OGG_VERSION=1.3.6
+ARG OGG_URL="https://downloads.xiph.org/releases/ogg/libogg-$OGG_VERSION.tar.xz"
+ARG OGG_FILE="ogg.$OGG_VERSION.tar.xz"
+ARG OGG_SHA256=5c8253428e181840cd20d41f3ca16557a9cc04bad4a3d04cce84808677fa1061
+ADD --checksum=sha256:$OGG_SHA256 --unpack=true $OGG_URL /
+RUN \
+  cd libogg-* && \
+  ./configure \
+    --disable-shared \
+    --enable-static && \
+  make -j$(nproc) -l$(nproc) install && \
+  echo "$OGG_VERSION" > /usr/local/share/versions/libogg
+
+# hard: vorbis needs ogg
+FROM ogg AS vorbis
+# bump: vorbis /VORBIS_VERSION=([\d.]+)/ https://github.com/xiph/vorbis.git|*
+# bump: vorbis after ./hashupdate Dockerfile VORBIS $LATEST
+# bump: vorbis link "CHANGES" https://github.com/xiph/vorbis/blob/master/CHANGES
+# bump: vorbis link "Source diff $CURRENT..$LATEST" https://github.com/xiph/vorbis/compare/v$CURRENT..v$LATEST
+ARG VORBIS_VERSION=1.3.7
+ARG VORBIS_URL="https://downloads.xiph.org/releases/vorbis/libvorbis-$VORBIS_VERSION.tar.xz"
+ARG VORBIS_FILE="vorbis.$VORBIS_VERSION.tar.xz"
+ARG VORBIS_SHA256=b33cc4934322bcbf6efcbacf49e3ca01aadbea4114ec9589d1b1e9d20f72954b
+ADD --checksum=sha256:$VORBIS_SHA256 --unpack=true $VORBIS_URL /
+RUN \
+  cd libvorbis-* && \
+  ./configure \
+    --disable-shared \
+    --enable-static \
+    --disable-oggtest && \
+  make -j$(nproc) -l$(nproc) install && \
+  echo "$VORBIS_VERSION" > /usr/local/share/versions/libvorbis
+
+FROM base AS libwebp
+# bump: libwebp /LIBWEBP_VERSION=([\d.]+)/ https://github.com/webmproject/libwebp.git|^1
+# bump: libwebp after ./hashupdate Dockerfile LIBWEBP $LATEST
+# bump: libwebp link "Release notes" https://github.com/webmproject/libwebp/releases/tag/v$LATEST
+# bump: libwebp link "Source diff $CURRENT..$LATEST" https://github.com/webmproject/libwebp/compare/v$CURRENT..v$LATEST
+ARG LIBWEBP_VERSION=1.6.0
+ARG LIBWEBP_URL="https://github.com/webmproject/libwebp/archive/v$LIBWEBP_VERSION.tar.gz"
+ARG LIBWEBP_FILE="libwebp.$LIBWEBP_VERSION.tar.gz"
+ARG LIBWEBP_SHA256=93a852c2b3efafee3723efd4636de855b46f9fe1efddd607e1f42f60fc8f2136
+ADD --checksum=sha256:$LIBWEBP_SHA256 --unpack=true $LIBWEBP_URL /
+RUN \
+  cd libwebp-* && \
+  ./autogen.sh && \
+  ./configure \
+    --disable-shared \
+    --enable-static \
+    --with-pic \
+    --enable-libwebpmux \
+    --disable-libwebpextras \
+    --disable-libwebpdemux \
+    --disable-sdl \
+    --disable-gl \
+    --disable-png \
+    --disable-jpeg \
+    --disable-tiff \
+    --disable-gif && \
+  make -j$(nproc) -l$(nproc) install && \
+  echo "$LIBWEBP_VERSION" > /usr/local/share/versions/libwebp
+
+FROM base AS builder
+COPY --link --from=fdk-aac /usr/local/ /usr/local/
+COPY --link --from=libwebp /usr/local/ /usr/local/
+COPY --link --from=mp3lame /usr/local/ /usr/local/
+COPY --link --from=opus /usr/local/ /usr/local/
+COPY --link --from=vorbis /usr/local/ /usr/local/
+
+ARG ENABLE_FDKAAC
+# bump: ffmpeg /FFMPEG_VERSION=([\d.]+)/ https://github.com/FFmpeg/FFmpeg.git|*
+# bump: ffmpeg after ./hashupdate Dockerfile FFMPEG $LATEST
+# bump: ffmpeg link "Changelog" https://github.com/FFmpeg/FFmpeg/blob/n$LATEST/Changelog
+# bump: ffmpeg link "Source diff $CURRENT..$LATEST" https://github.com/FFmpeg/FFmpeg/compare/n$CURRENT..n$LATEST
+ARG FFMPEG_VERSION=9.1
+ARG FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz"
+ARG FFMPEG_FILE="ffmpeg.$FFMPEG_VERSION.tar.xz"
+ARG FFMPEG_SHA256=1a4d394ae63d190a526cd052eb4415c156b5c5e2df37efab41a7de0b8fde2433
+# sed changes --toolchain=hardened -pie to -static-pie
+# input side complete so every file in a library opens; output side, filters and protocols limited to what Navidrome calls
+ADD --checksum=sha256:$FFMPEG_SHA256 --unpack=true $FFMPEG_URL /
+RUN \
+  cd ffmpeg-* && \
+  FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-libfdk-xhe-aac --enable-nonfree " ;else echo ""; fi) && \
+  sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
+  ./configure \
+  --pkg-config-flags="--static" \
+  --extra-cflags="-fopenmp" \
+  --extra-ldflags="-fopenmp" \
+  --toolchain=hardened \
+  --disable-debug \
+  --disable-shared \
+  --enable-static \
+  --disable-doc \
+  --disable-autodetect \
+  --disable-network \
+  --disable-everything \
+  $FDKAAC_FLAGS \
+  --enable-iconv \
+  --enable-zlib \
+  --enable-libmp3lame \
+  --enable-libopus \
+  --enable-libsoxr \
+  --enable-libvorbis \
+  --enable-libwebp \
+  --enable-decoders \
+  --enable-demuxers \
+  --enable-parsers \
+  --enable-encoder=aac,flac,libfdk_aac,libfdk_xhe_aac,libmp3lame,libopus,libvorbis,libwebp_anim \
+  --enable-muxer=adts,flac,image2pipe,mp3,ogg,opus,webp \
+  --enable-filter=aresample,scale \
+  --enable-protocol=file,pipe \
+  || (cat ffbuild/config.log ; false) && \
+  make -j$(nproc) -l$(nproc) install-progs
+
+RUN \
+  SOXR_VERSION=$(pkg-config --modversion soxr) \
+  ZLIB_VERSION=$(pkg-config --modversion zlib) \
+  jq -S -Rn \
+  '{ \
+  ffmpeg: env.FFMPEG_VERSION, \
+  libsoxr: env.SOXR_VERSION, \
+  zlib: env.ZLIB_VERSION, \
+  } + reduce inputs as $v ({}; . + {(input_filename | split("/")[-1]): $v})' /usr/local/share/versions/* > /versions.json
+
+# make sure binaries has no dependencies, is relro, pie and stack nx
+RUN \
+  for f in /usr/local/bin/ffmpeg /usr/local/bin/ffprobe; do \
+    NOEXTLIBS=$(test "$(ldd "$f" | wc -l)" -eq 1 && echo yes || echo no) && \
+    RELRO=$(readelf -l "$f" | grep -q GNU_RELRO && echo yes || echo no) && \
+    BIND_NOW=$(readelf -d "$f" | grep -q BIND_NOW && echo yes || echo no) && \
+    PIE=$(readelf -h "$f" | grep -q DYN && echo yes || echo no) && \
+    STACKNX=$(readelf -W -l "$f" | grep GNU_STACK | grep -q -v RWE && echo yes || echo no) && \
+    file "$f" && \
+    echo "No external libs: $NOEXTLIBS" && \
+    echo "Relocate read-only: $RELRO" && \
+    echo "Resolve at startup: $BIND_NOW" && \
+    echo "Position independent code: $PIE" && \
+    echo "Stack non-executable: $STACKNX" && \
+    [ "$NOEXTLIBS" = "yes" ] && \
+    [ "$RELRO" = "yes" ] && \
+    [ "$BIND_NOW" = "yes" ] && \
+    [ "$PIE" = "yes" ] && \
+    [ "$STACKNX" = "yes" ] || exit 1; \
+  done
+
+FROM scratch AS final1
+COPY --link --from=builder /usr/local/bin/ffmpeg /
+COPY --link --from=builder /usr/local/bin/ffprobe /
+COPY --link --from=builder /versions.json /
+
+# sanity tests
+RUN ["/ffmpeg", "-version"]
+RUN ["/ffprobe", "-version"]
+RUN ["/ffmpeg", "-hide_banner", "-buildconf"]
+# the four default transcodings of Navidrome, with seek, resampling and channel mixing
+RUN ["/ffmpeg", "-v", "error", "-ss", "1", "-f", "s16le", "-ar", "44100", "-ac", "2", "-t", "2", "-i", "/dev/zero", "-map", "0:a:0", "-map_metadata", "0", "-map_metadata", "0:s:a:0", "-c:a", "libmp3lame", "-b:a", "192k", "-ar", "48000", "-ac", "1", "-f", "mp3", "-y", "/dev/null"]
+RUN ["/ffmpeg", "-v", "error", "-ss", "1", "-f", "s16le", "-ar", "44100", "-ac", "2", "-t", "2", "-i", "/dev/zero", "-map", "0:a:0", "-map_metadata", "0", "-map_metadata", "0:s:a:0", "-c:a", "libopus", "-b:a", "128k", "-f", "opus", "-y", "/dev/null"]
+RUN ["/ffmpeg", "-v", "error", "-ss", "1", "-f", "s16le", "-ar", "44100", "-ac", "2", "-t", "2", "-i", "/dev/zero", "-map", "0:a:0", "-map_metadata", "0", "-map_metadata", "0:s:a:0", "-c:a", "aac", "-b:a", "256k", "-f", "adts", "-y", "/dev/null"]
+RUN ["/ffmpeg", "-v", "error", "-ss", "1", "-f", "s16le", "-ar", "44100", "-ac", "2", "-t", "2", "-i", "/dev/zero", "-map", "0:a:0", "-map_metadata", "0", "-map_metadata", "0:s:a:0", "-c:a", "flac", "-sample_fmt", "s32", "-f", "flac", "-y", "/dev/null"]
+# vorbis target and soxr resampling for custom transcodings
+RUN ["/ffmpeg", "-v", "error", "-f", "s16le", "-ar", "44100", "-ac", "2", "-t", "2", "-i", "/dev/zero", "-map", "0:a:0", "-af", "aresample=resampler=soxr", "-ar", "48000", "-c:a", "libvorbis", "-b:a", "192k", "-f", "ogg", "-y", "/dev/null"]
+# animated cover conversion as Navidrome calls it
+RUN ["/ffmpeg", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "64x48", "-i", "/dev/zero", "-frames:v", "3", "-vf", "scale='min(32,iw)':'min(32,ih)':force_original_aspect_ratio=decrease", "-loop", "0", "-c:v", "libwebp_anim", "-quality", "75", "-f", "webp", "-y", "/dev/null"]
+
+# clamp all files into one layer
+FROM scratch AS final2
+COPY --link --from=final1 / /
+
+FROM final2
+LABEL maintainer="Mattias Wadman mattias.wadman@gmail.com"
+ENTRYPOINT ["/ffmpeg"]
