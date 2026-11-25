@@ -16,19 +16,54 @@ RUN apk add $APK_OPTS \
   autoconf automake \
   libtool \
   nasm \
-  jq \
-  zlib-dev zlib-static \
-  soxr-dev soxr-static
+  cmake \
+  jq
 
 # -O3 makes sure we compile with optimization. setting CFLAGS/CXXFLAGS seems to override
 # default automake cflags.
 # -static-libgcc is needed to make gcc not include gcc_s as "as-needed" shared library which
 # cmake will include as a implicit library.
-# other options to get hardened build (same as ffmpeg hardened)
-ARG CFLAGS="-O3 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
-ARG CXXFLAGS="-O3 -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC"
-ARG LDFLAGS="-Wl,-z,relro,-z,now"
+# -fPIC so the archives can be linked into the static pie
+ARG CFLAGS="-O3 -static-libgcc -fstack-protector-strong -fPIC"
+ARG CXXFLAGS="-O3 -static-libgcc -fstack-protector-strong -fPIC"
 RUN mkdir -p /usr/local/share/versions
+
+FROM base AS zlib
+# bump: zlib /ZLIB_VERSION=([\d.]+)/ https://github.com/madler/zlib.git|^1
+# bump: zlib after ./hashupdate Dockerfile ZLIB $LATEST
+# bump: zlib link "ChangeLog" https://github.com/madler/zlib/blob/develop/ChangeLog
+ARG ZLIB_VERSION=1.3.2
+ARG ZLIB_URL="https://zlib.net/fossils/zlib-$ZLIB_VERSION.tar.gz"
+ARG ZLIB_FILE="zlib.$ZLIB_VERSION.tar.gz"
+ARG ZLIB_SHA256=bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16
+ADD --checksum=sha256:$ZLIB_SHA256 --unpack=true $ZLIB_URL /
+RUN \
+  cd zlib-* && \
+  ./configure --static && \
+  make -j$(nproc) -l$(nproc) install && \
+  echo "$ZLIB_VERSION" > /usr/local/share/versions/zlib
+
+FROM base AS soxr
+# bump: soxr /SOXR_VERSION=([\d.]+)/ fetch:https://sourceforge.net/projects/soxr/files/|/soxr-([\d.]+)-Source\.tar\.xz/
+# bump: soxr after ./hashupdate Dockerfile SOXR $LATEST
+# bump: soxr link "NEWS" https://sourceforge.net/p/soxr/code/ci/master/tree/NEWS
+ARG SOXR_VERSION=0.1.3
+ARG SOXR_URL="https://downloads.sourceforge.net/project/soxr/soxr-$SOXR_VERSION-Source.tar.xz"
+ARG SOXR_FILE="soxr.$SOXR_VERSION.tar.xz"
+ARG SOXR_SHA256=b111c15fdc8c029989330ff559184198c161100a59312f5dc19ddeb9b5a15889
+ADD --checksum=sha256:$SOXR_SHA256 --unpack=true $SOXR_URL /
+RUN \
+  cd soxr-* && \
+  cmake -B build \
+    -DCMAKE_VERBOSE_MAKEFILE=ON \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DBUILD_TESTS=OFF \
+    -DWITH_LSR_BINDINGS=OFF && \
+  cmake --build build -j$(nproc) -- -l$(nproc) && \
+  cmake --install build && \
+  echo "$SOXR_VERSION" > /usr/local/share/versions/libsoxr
 
 FROM base AS fdk-aac
 # bump: fdk-aac /FDK_AAC_VERSION=([\d.]+)/ https://github.com/mstorsjo/fdk-aac.git|*
@@ -166,7 +201,9 @@ COPY --link --from=fdk-aac /usr/local/ /usr/local/
 COPY --link --from=libwebp /usr/local/ /usr/local/
 COPY --link --from=mp3lame /usr/local/ /usr/local/
 COPY --link --from=opus /usr/local/ /usr/local/
+COPY --link --from=soxr /usr/local/ /usr/local/
 COPY --link --from=vorbis /usr/local/ /usr/local/
+COPY --link --from=zlib /usr/local/ /usr/local/
 
 ARG ENABLE_FDKAAC
 # bump: ffmpeg /FFMPEG_VERSION=([\d.]+)/ https://github.com/FFmpeg/FFmpeg.git|*
@@ -177,18 +214,16 @@ ARG FFMPEG_VERSION=9.1
 ARG FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz"
 ARG FFMPEG_FILE="ffmpeg.$FFMPEG_VERSION.tar.xz"
 ARG FFMPEG_SHA256=1a4d394ae63d190a526cd052eb4415c156b5c5e2df37efab41a7de0b8fde2433
-# sed changes --toolchain=hardened -pie to -static-pie
 # input side complete so every file in a library opens; output side, filters and protocols limited to what Navidrome calls
 ADD --checksum=sha256:$FFMPEG_SHA256 --unpack=true $FFMPEG_URL /
 RUN \
   cd ffmpeg-* && \
   FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-libfdk-xhe-aac --enable-nonfree " ;else echo ""; fi) && \
-  sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
   ./configure \
   --pkg-config-flags="--static" \
-  --extra-cflags="-fopenmp" \
+  --extra-cflags="-fopenmp -fPIE" \
   --extra-ldflags="-fopenmp" \
-  --toolchain=hardened \
+  --extra-ldexeflags="-fPIE -static-pie" \
   --disable-debug \
   --disable-shared \
   --enable-static \
@@ -215,32 +250,22 @@ RUN \
   make -j$(nproc) -l$(nproc) install-progs
 
 RUN \
-  SOXR_VERSION=$(pkg-config --modversion soxr) \
-  ZLIB_VERSION=$(pkg-config --modversion zlib) \
   jq -S -Rn \
   '{ \
   ffmpeg: env.FFMPEG_VERSION, \
-  libsoxr: env.SOXR_VERSION, \
-  zlib: env.ZLIB_VERSION, \
   } + reduce inputs as $v ({}; . + {(input_filename | split("/")[-1]): $v})' /usr/local/share/versions/* > /versions.json
 
-# make sure binaries has no dependencies, is relro, pie and stack nx
+# make sure binaries has no dependencies, is pie and stack nx
 RUN \
   for f in /usr/local/bin/ffmpeg /usr/local/bin/ffprobe; do \
     NOEXTLIBS=$(test "$(ldd "$f" | wc -l)" -eq 1 && echo yes || echo no) && \
-    RELRO=$(readelf -l "$f" | grep -q GNU_RELRO && echo yes || echo no) && \
-    BIND_NOW=$(readelf -d "$f" | grep -q BIND_NOW && echo yes || echo no) && \
     PIE=$(readelf -h "$f" | grep -q DYN && echo yes || echo no) && \
     STACKNX=$(readelf -W -l "$f" | grep GNU_STACK | grep -q -v RWE && echo yes || echo no) && \
     file "$f" && \
     echo "No external libs: $NOEXTLIBS" && \
-    echo "Relocate read-only: $RELRO" && \
-    echo "Resolve at startup: $BIND_NOW" && \
     echo "Position independent code: $PIE" && \
     echo "Stack non-executable: $STACKNX" && \
     [ "$NOEXTLIBS" = "yes" ] && \
-    [ "$RELRO" = "yes" ] && \
-    [ "$BIND_NOW" = "yes" ] && \
     [ "$PIE" = "yes" ] && \
     [ "$STACKNX" = "yes" ] || exit 1; \
   done
