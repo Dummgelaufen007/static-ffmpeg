@@ -14,7 +14,7 @@ ARG TARGETARCH
 
 RUN NAME="ffmpeg-${TARGETARCH}-${VARIANT:+$VARIANT-}${CACHE_BUST}" && \
     mv /data "/${NAME}" && \
-    tar -I "xz --lzma2=preset=9e,dict=192MiB" \
+    tar -I "xz -T1 --lzma2=dict=192MiB" \
         --sort=name \
         -cf "/${NAME}.tar.xz" \
         -C / \
