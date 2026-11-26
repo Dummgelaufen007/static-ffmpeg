@@ -2,10 +2,27 @@
 # bump: alpine /ALPINE_VERSION=alpine:([\d.]+)/ docker:alpine|^3
 # bump: alpine link "Release notes" https://alpinelinux.org/posts/Alpine-$LATEST-released.html
 ARG ALPINE_VERSION=alpine:3.24.4
-FROM $ALPINE_VERSION AS builder
 
 # Alpine Package Keeper options
 ARG APK_OPTS=""
+
+# autoreconf needs gettext-dev, whose libintl.h redirects gettext to libintl_ symbols; kept out of the builder so no other recipe compiles against it
+FROM $ALPINE_VERSION AS zvbi
+ARG APK_OPTS
+RUN apk add --no-cache $APK_OPTS autoconf automake libtool gettext-dev
+# bump: zvbi /ZVBI_VERSION=([\d.]+)/ https://github.com/zapping-vbi/zvbi.git|*
+# bump: zvbi after ./hashupdate Dockerfile ZVBI $LATEST
+# bump: zvbi link "NEWS" https://github.com/zapping-vbi/zvbi/blob/main/NEWS
+ARG ZVBI_VERSION=0.2.46
+ARG ZVBI_URL="https://github.com/zapping-vbi/zvbi/archive/refs/tags/v$ZVBI_VERSION.tar.gz"
+ARG ZVBI_SHA256=817a26118e2654155ee761cd39414885986a4315fdb6617af5314090ddfffd10
+ADD --checksum=sha256:$ZVBI_SHA256 --unpack=true $ZVBI_URL /
+RUN \
+  mv zvbi-* zvbi && cd zvbi && \
+  autoreconf -fiv
+
+FROM $ALPINE_VERSION AS builder
+ARG APK_OPTS
 
 RUN apk add --no-cache $APK_OPTS \
   coreutils \
@@ -51,7 +68,13 @@ RUN apk add --no-cache $APK_OPTS \
   # replace the pcre2 and libffi downloads of glib
   pcre2-dev pcre2-static libffi-dev \
   # replaces the proxy-libintl download of glib
-  musl-libintl
+  musl-libintl \
+  # needed by curl
+  nghttp2-dev nghttp2-static \
+  nghttp3-dev nghttp3-static \
+  zstd-dev zstd-static \
+  libidn2-dev libidn2-static libunistring-static \
+  libpsl-dev libpsl-static
 
 # -O3 makes sure we compile with optimization. setting CFLAGS/CXXFLAGS seems to override
 # default automake cflags.
@@ -115,9 +138,9 @@ RUN sed -i 's/-Wl,--export-dynamic//' /usr/local/lib/pkgconfig/gmodule-2.0.pc /u
 # bump: harfbuzz /LIBHARFBUZZ_VERSION=([\d.]+)/ https://github.com/harfbuzz/harfbuzz.git|*
 # bump: harfbuzz after ./hashupdate Dockerfile LIBHARFBUZZ $LATEST
 # bump: harfbuzz link "NEWS" https://github.com/harfbuzz/harfbuzz/blob/main/NEWS
-ARG LIBHARFBUZZ_VERSION=15.1.0
+ARG LIBHARFBUZZ_VERSION=15.2.0
 ARG LIBHARFBUZZ_URL="https://github.com/harfbuzz/harfbuzz/releases/download/$LIBHARFBUZZ_VERSION/harfbuzz-$LIBHARFBUZZ_VERSION.tar.xz"
-ARG LIBHARFBUZZ_SHA256=0fc7c565443a5f4be7da65ac5ee5bd737d9b158dc908708b7689a0a5796b0c8d
+ARG LIBHARFBUZZ_SHA256=e2ec49090744383cdbe7df808c1cedaafba06a97be8dc4211fe546ba585f12cb
 ADD --checksum=sha256:$LIBHARFBUZZ_SHA256 --unpack=true $LIBHARFBUZZ_URL /
 RUN \
   cd harfbuzz-* && \
@@ -750,6 +773,65 @@ RUN \
     .. && \
   make -j$(nproc) install
 
+# alpine's ngtcp2 only has the gnutls crypto backend, curl's HTTP/3 needs the openssl one
+# bump: ngtcp2 /NGTCP2_VERSION=([\d.]+)/ https://github.com/ngtcp2/ngtcp2.git|*
+# bump: ngtcp2 after ./hashupdate Dockerfile NGTCP2 $LATEST
+# bump: ngtcp2 link "Release notes" https://github.com/ngtcp2/ngtcp2/releases/tag/v$LATEST
+ARG NGTCP2_VERSION=1.26.0
+ARG NGTCP2_URL="https://github.com/ngtcp2/ngtcp2/releases/download/v$NGTCP2_VERSION/ngtcp2-$NGTCP2_VERSION.tar.xz"
+ARG NGTCP2_SHA256=7804aa0fa1c39942ba322a90805824c37231f7675b08d0c3cc4332858a7b085e
+ADD --checksum=sha256:$NGTCP2_SHA256 --unpack=true $NGTCP2_URL /
+RUN \
+  cd ngtcp2-* && \
+  ./configure \
+    --disable-shared \
+    --enable-static \
+    --enable-lib-only \
+    --with-openssl && \
+  make -j$(nproc) install
+
+# bump: libcurl /LIBCURL_VERSION=([\d.]+)/ gitrefs:https://github.com/curl/curl.git|re:#^refs/tags/curl-(\d+)_(\d+)_(\d+)$#${1}.${2}.${3}#|*
+# bump: libcurl after ./hashupdate Dockerfile LIBCURL $LATEST
+# bump: libcurl link "Changelog" https://curl.se/ch/$LATEST.html
+ARG LIBCURL_VERSION=8.23.0
+ARG LIBCURL_URL="https://curl.se/download/curl-$LIBCURL_VERSION.tar.xz"
+ARG LIBCURL_SHA256=8dadd7d2536a314f982ad05a651b713f426bf7d02cc2c76cffb9796f2218e6c5
+# ffmpeg's libcurl protocol only speaks http and https
+ADD --checksum=sha256:$LIBCURL_SHA256 --unpack=true $LIBCURL_URL /
+RUN \
+  cd curl-* && \
+  ./configure \
+    --disable-shared \
+    --enable-static \
+    --with-openssl \
+    --with-ngtcp2 \
+    --with-nghttp3 \
+    --with-nghttp2 \
+    --with-zlib \
+    --with-brotli \
+    --with-zstd \
+    --with-libidn2 \
+    --with-libpsl \
+    --disable-dict \
+    --disable-file \
+    --disable-ftp \
+    --disable-gopher \
+    --disable-imap \
+    --disable-ipfs \
+    --disable-ldap \
+    --disable-mqtt \
+    --disable-pop3 \
+    --disable-rtsp \
+    --disable-smtp \
+    --disable-telnet \
+    --disable-tftp \
+    --disable-websockets \
+    --disable-docs \
+    --disable-manual && \
+  make -j$(nproc) -C lib install && \
+  make -C include install && \
+  make install-pkgconfigDATA
+
 # bump: svtav1 /SVTAV1_VERSION=([\d.]+)/ https://gitlab.com/AOMediaCodec/SVT-AV1.git|*
 # bump: svtav1 after ./hashupdate Dockerfile SVTAV1 $LATEST
 # bump: svtav1 link "Release notes" https://gitlab.com/AOMediaCodec/SVT-AV1/-/releases/v$LATEST
@@ -1110,6 +1192,23 @@ RUN \
     --enable-static && \
   make -j$(nproc) install
 
+# ffmpeg only decodes, so no capture interfaces and no png page export
+COPY --from=zvbi /zvbi/ /zvbi/
+RUN \
+  cd zvbi && \
+  ac_cv_lib_png_png_destroy_write_struct=no \
+  ./configure \
+    --disable-dependency-tracking \
+    --disable-shared \
+    --enable-static \
+    --with-pic \
+    --disable-v4l \
+    --disable-dvb \
+    --disable-proxy \
+    --disable-nls && \
+  make -j$(nproc) -C src install && \
+  make install-pkgconfigDATA
+
 # bump: vvenc /VVENC_VERSION=([\d.]+)/ https://github.com/fraunhoferhhi/vvenc.git|*
 # bump: vvenc after ./hashupdate Dockerfile VVENC $LATEST
 # bump: vvenc link "CHANGELOG" https://github.com/fraunhoferhhi/vvenc/releases/tag/v$LATEST
@@ -1135,23 +1234,18 @@ RUN \
 # bump: ffmpeg after ./hashupdate Dockerfile FFMPEG $LATEST
 # bump: ffmpeg link "Changelog" https://github.com/FFmpeg/FFmpeg/blob/n$LATEST/Changelog
 # bump: ffmpeg link "Source diff $CURRENT..$LATEST" https://github.com/FFmpeg/FFmpeg/compare/n$CURRENT..n$LATEST
-ARG FFMPEG_VERSION=9.0.2
+ARG FFMPEG_VERSION=9.1
 ARG FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2"
-ARG FFMPEG_SHA256=ee80a25a5621df84498cef46917be87eab3b4f01951e85c2c7cbe5c94914ee70
-# openapv >= 1.1 API, in release/9.0 after 9.0.2
-ARG FFMPEG_OAPV_URL="https://github.com/FFmpeg/FFmpeg/commit/c54710db21c1827dbc3e47658a562525af0fe528.patch"
-ARG FFMPEG_OAPV_SHA256=f773a85ec68f3b26e0b2ab3cddb7a304df5be8eb5c1887c9b627e23e782c7ec2
+ARG FFMPEG_SHA256=1ba978f21a9cdf3506a98afb6b410f62c42a7225b08952ff437204156dfe7bef
 # sed changes --toolchain=hardened -pie to -static-pie
 #
 # ldflags stack-size=2097152 is to increase default stack size from 128KB (musl default) to something
 # more similar to glibc (2MB). This fixing segfault with libaom-av1 and libsvtav1 as they seems to pass
 # large things on the stack.
 ADD --checksum=sha256:$FFMPEG_SHA256 --unpack=true $FFMPEG_URL /
-ADD --checksum=sha256:$FFMPEG_OAPV_SHA256 $FFMPEG_OAPV_URL /ffmpeg-oapv.patch
 RUN \
   cd ffmpeg-* && \
-  git apply ../ffmpeg-oapv.patch && \
-  FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-nonfree " ;else echo ""; fi) && \
+  FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-libfdk-xhe-aac --enable-nonfree " ;else echo ""; fi) && \
   sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
   ./configure \
   --pkg-config-flags="--static" \
@@ -1174,6 +1268,7 @@ RUN \
   --enable-libaribb24 \
   --enable-libass \
   --enable-libbluray \
+  --enable-libcurl \
   --enable-libdav1d \
   --enable-libdavs2 \
   --enable-libdvdnav \
@@ -1224,6 +1319,7 @@ RUN \
   --enable-libxvid \
   --enable-libzimg \
   --enable-libzmq \
+  --enable-libzvbi \
   --enable-openssl \
   || (cat ffbuild/config.log ; false) \
   && make -j$(nproc) install
@@ -1238,11 +1334,14 @@ RUN \
   LIBSAMPLERATE_VERSION=$(pkg-config --modversion samplerate) \
   LIBVO_AMRWBENC_VERSION=$(pkg-config --modversion vo-amrwbenc) \
   LIBXML2_VERSION=$(pkg-config --modversion libxml-2.0) \
+  NGHTTP2_VERSION=$(pkg-config --modversion libnghttp2) \
+  NGHTTP3_VERSION=$(pkg-config --modversion libnghttp3) \
   OPENSSL_VERSION=$(pkg-config --modversion openssl) \
   PCRE2_VERSION=$(pkg-config --modversion libpcre2-8) \
   PIXMAN_VERSION=$(pkg-config --modversion pixman-1) \
   SNAPPY_VERSION=$(apk info -a snappy $APK_OPTS | head -n1 | awk '{print $1}' | sed -e 's/snappy-//') \
   SOXR_VERSION=$(pkg-config --modversion soxr) \
+  ZVBI_VERSION=$(pkg-config --modversion zvbi-0.2) \
   jq -n \
   '{ \
   chromaprint: env.CHROMAPRINT_VERSION, \
@@ -1256,6 +1355,7 @@ RUN \
   libaribb24: env.LIBARIBB24_VERSION, \
   libass: env.LIBASS_VERSION, \
   libbluray: env.LIBBLURAY_VERSION, \
+  libcurl: env.LIBCURL_VERSION, \
   libdav1d: env.DAV1D_VERSION, \
   libdavs2: env.DAVS2_VERSION, \
   libdvdcss: env.LIBDVDCSS_VERSION, \
@@ -1310,6 +1410,10 @@ RUN \
   libxvid: env.XVID_VERSION, \
   libzimg: env.ZIMG_VERSION, \
   libzmq: env.LIBZMQ_VERSION, \
+  libzvbi: env.ZVBI_VERSION, \
+  nghttp2: env.NGHTTP2_VERSION, \
+  nghttp3: env.NGHTTP3_VERSION, \
+  ngtcp2: env.NGTCP2_VERSION, \
   openssl: env.OPENSSL_VERSION, \
   pcre2: env.PCRE2_VERSION, \
   pixman: env.PIXMAN_VERSION, \
