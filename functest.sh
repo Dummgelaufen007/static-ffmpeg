@@ -242,6 +242,7 @@ check libvidstab-detect ff "${VSRC[@]}" -vf vidstabdetect=result=vidstab.trf -f 
 check libvidstab-transform ff "${VSRC[@]}" -vf vidstabtransform=input=vidstab.trf -f null -
 check libvmaf ff "${VSRC[@]}" "${VSRC[@]}" -lavfi libvmaf -f null -
 check libzimg ff "${VSRC[@]}" -vf zscale=w=160:h=120 -f null -
+check cairo ff "${VSRC[@]}" -vf "drawvg=ellipse (w/2) (h/2) (w/3) (h/3) stroke" -f null -
 reject libfreetype freetype ff "${ASRC[@]}" -lavfi "[0:a]showcqt=fontfile=$FONTFILE" -frames:v 1 -f null -
 check libharfbuzz ff "${VSRC[@]}" -vf "drawtext=fontfile=$FONTFILE:text=harfbuzz" -f null -
 check libfribidi ff "${VSRC[@]}" -vf "drawtext=fontfile=$FONTFILE:text=שלום" -f null -
